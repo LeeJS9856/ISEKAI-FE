@@ -267,9 +267,10 @@ export class LAppLive2DManager {
         model.setExpression('exp_y'); // "Name"인 "exp_y"를 사용
         LAppPal.printMessage('[APP]Keyboard: Expression exp_y');
         break;
-
-
-
+      case 'c':
+        model.setExpression('exp_c'); // "Name"인 "exp_c"를 사용
+        LAppPal.printMessage('[APP]Keyboard: Expression exp_c');
+        break;
 
 
 
