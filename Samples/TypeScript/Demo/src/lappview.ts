@@ -137,9 +137,28 @@ export class LAppView {
       const x: number = width * 0.5;
       const y: number = height * 0.5;
 
-      const fwidth = textureInfo.width * 2.0;
-      const fheight = height * 0.95;
-      this._back = new LAppSprite(x, y, fwidth, fheight, textureInfo.id);
+      // --- 여기서부터 수정
+      
+      // 1. 캔버스(화면)와 이미지의 비율을 계산합니다.
+      const canvasRatio = width / height;
+      const imageRatio = textureInfo.width / textureInfo.height;
+
+      let fwidth: number;
+      let fheight: number;
+
+      // 2. 비율을 비교해서 너비와 높이를 정합니다.
+      if (imageRatio > canvasRatio) {
+        // 이미지가 캔버스보다 가로로 더 길 경우
+        fheight = height; // 높이를 캔버스에 맞춤
+        fwidth = fheight * imageRatio; // 너비는 이미지 비율에 따라 조정
+      } else {
+        // 이미지가 캔버스보다 세로로 더 길거나 같을 경우
+        fwidth = width; // 너비를 캔버스에 맞춤
+        fheight = fwidth / imageRatio; // 높이는 이미지 비율에 따라 조정
+      }
+      
+      // --- 여기까지 수정 ---
+      this._back = new LAppSprite(x , y, fwidth, fheight, textureInfo.id);
       this._back.setSubdelegate(this._subdelegate);
     };
 
