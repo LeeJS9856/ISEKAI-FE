@@ -406,4 +406,8 @@ export class LAppDelegate {
       }
     }
   }
+
+  public getWebSocketManager(): WebSocketManager | null {
+    return this._webSocketManager;
+  }
 }
