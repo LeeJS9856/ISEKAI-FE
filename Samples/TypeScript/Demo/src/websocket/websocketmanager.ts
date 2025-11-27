@@ -1,5 +1,6 @@
 // src/managers/websocketManager.ts
 import { AudioStreamManager } from './audioStreamManager';
+import { LAppDelegate } from '../lappdelegate';
 
 export class WebSocketManager {
   private ws: WebSocket | null = null;
@@ -96,6 +97,8 @@ export class WebSocketManager {
         this.ws.onmessage = (event) => {
           console.log('[WebSocket] 서버 응답:', event.data);
           this.handleServerMessage(event.data);
+
+
         };
       } catch (error) {
         console.error('[WebSocket] 연결 실패:', error);
@@ -176,6 +179,22 @@ export class WebSocketManager {
     try {
       const message = JSON.parse(data);
       console.log('[WebSocket] 파싱된 메시지:', message);
+
+      if (message.messageType === "SUBTITLE" && message.content?.text) {
+        const subtitleText = message.content.text;
+        const appDelegate = LAppDelegate.getInstance()
+        // Live2D 매니저를 가져옵니다.
+        const live2DManager = appDelegate['_subdelegates'].at(0)?.getLive2DManager();
+        if (live2DManager) {
+          const modelName = live2DManager.getCurrentModelDisplayName();
+          
+          // 자막만 업데이트 (감정 표현 없이)
+          live2DManager.showSubtitleMessage(modelName, subtitleText);
+        }
+      else{
+        console.log('[WebSocket] subtitle 객체가 정의되지 않았습니다.');
+      }
+    }
     } catch (error) {
       console.log('[WebSocket] 원본 메시지:', data);
     }
