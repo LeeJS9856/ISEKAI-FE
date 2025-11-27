@@ -1,8 +1,10 @@
+// src/websocket/websocketmanager.ts
+import { LAppDelegate } from '../lappdelegate';
+import { AudioStreamManager } from '../websocket/audioStreamManager';
+
 export class WebSocketManager {
   private ws: WebSocket | null = null;
-  private audioContext: AudioContext | null = null;
-  private mediaStream: MediaStream | null = null;
-  private audioWorkletNode: AudioWorkletNode | null = null;
+  private audioManager: AudioStreamManager;
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
@@ -15,12 +17,25 @@ export class WebSocketManager {
   private currentChannels: number = 1;
   private currentSampleRate: number = 24000;
 
-  constructor(private serverUrl: string) {}
+  constructor(
+    private serverUrl: string,
+    audioManager?: AudioStreamManager
+  ) {
+    // AudioManager를 외부에서 주입받거나, 없으면 내부에서 생성
+    this.audioManager = audioManager || new AudioStreamManager();
+  }
+
+  /**
+   * WebSocket과 오디오 스트리밍 초기화
+   */
   public async initialize(): Promise<void> {
     await this.connectWebSocket();
     await this.startAudioStreaming();
   }
 
+  /**
+   * WebSocket 연결
+   */
   private connectWebSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -59,6 +74,9 @@ export class WebSocketManager {
     });
   }
 
+  /**
+   * 재연결 시도
+   */
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[WebSocket] 최대 재연결 시도 횟수 초과');
@@ -66,7 +84,9 @@ export class WebSocketManager {
     }
 
     this.reconnectAttempts++;
-    console.log(`[WebSocket] ${this.reconnectDelay / 1000}초 후 재연결 시도... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    console.log(
+      `[WebSocket] ${this.reconnectDelay / 1000}초 후 재연결 시도... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+    );
 
     setTimeout(() => {
       this.initialize().catch((error) => {
@@ -75,60 +95,29 @@ export class WebSocketManager {
     }, this.reconnectDelay);
   }
 
+  /**
+   * 오디오 스트리밍 시작 (마이크 -> 서버)
+   */
   private async startAudioStreaming(): Promise<void> {
     try {
-      console.log('[Audio] 마이크 접근 요청...');
+      // 오디오 재생 컨텍스트 초기화
+      this.audioManager.initializePlayback();
 
-      // 마이크 권한 요청
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+      // 마이크 스트리밍 시작
+      await this.audioManager.startMicrophoneStreaming((audioData) => {
+        this.sendAudioData(audioData);
       });
 
-      console.log('[Audio] 마이크 접근 허용됨');
-
-      // AudioContext 생성
-      if (!this.audioContext) {
-        this.audioContext = new AudioContext({ sampleRate: 16000 });
-      } else if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      
-      const source = this.audioContext.createMediaStreamSource(this.mediaStream);
-
-      // AudioWorklet 로드 및 생성
-      try {
-        await this.audioContext.audioWorklet.addModule('audio-processor.js');
-      } catch (e) {
-        // 이미 로드된 경우 무시
-      }
-      this.audioWorkletNode = new AudioWorkletNode(
-        this.audioContext,
-        'audio-processor'
-      );
-
-      // 오디오 데이터 수신 및 전송
-      this.audioWorkletNode.port.onmessage = (event) => {
-        const audioData: Float32Array = event.data;
-        this.sendAudioData(audioData);
-      };
-
-      // 오디오 노드 연결
-      source.connect(this.audioWorkletNode);
-      this.audioWorkletNode.connect(this.audioContext.destination);
-
-      console.log('[Audio] 실시간 스트리밍 시작');
+      console.log('[WebSocket] 오디오 스트리밍 활성화');
     } catch (error) {
-      console.error('[Audio] 스트리밍 시작 실패:', error);
+      console.error('[WebSocket] 오디오 스트리밍 시작 실패:', error);
       throw error;
     }
   }
 
+  /**
+   * 오디오 데이터를 서버로 전송
+   */
   private sendAudioData(audioData: Float32Array): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return;
@@ -142,6 +131,9 @@ export class WebSocketManager {
     }
   }
 
+  /**
+   * Float32 -> Int16 변환
+   */
   private float32ToInt16(float32Array: Float32Array): Int16Array {
     const int16Array = new Int16Array(float32Array.length);
     for (let i = 0; i < float32Array.length; i++) {
@@ -151,177 +143,66 @@ export class WebSocketManager {
     return int16Array;
   }
 
+  /**
+   * 서버로부터 받은 텍스트 메시지 처리
+   */
   private handleServerMessage(data: string): void {
     try {
       const message = JSON.parse(data);
-      
-      switch (message.messageType) {
-        case 'SERVER_READY':
-          console.log('[WebSocket] 서버 준비 완료:', message.content.text);
-          break;
-        
-        case 'SUBTITLE':
-          console.log('[Subtitle] 자막 수신:', message.content.text);
-          break;
 
-        default:
-          console.log('[WebSocket] 알 수 없는 메시지:', message);
+      console.log('[WebSocket] 서버 응답:', message);
+      if (message.messageType === "SUBTITLE" && message.content?.text) {
+        const subtitleText = message.content.text;
+        const appDelegate = LAppDelegate.getInstance()
+        // Live2D 매니저를 가져옵니다.
+        const live2DManager = appDelegate['_subdelegates'].at(0)?.getLive2DManager();
+        if (live2DManager) {
+          const modelName = live2DManager.getCurrentModelDisplayName();
+
+          // 자막만 업데이트 (감정 표현 없이)
+          live2DManager.showSubtitleMessage(modelName, subtitleText);
+        }
+      else{
+        console.log('[WebSocket] subtitle 객체가 정의되지 않았습니다.');
       }
+    }
     } catch (error) {
       console.error('[WebSocket] 메시지 파싱 실패:', error);
     }
   }
 
-  // 오디오 큐 관리
-  private audioQueue: Float32Array[] = [];
-
+  /**
+   * 서버로부터 받은 바이너리 메시지 처리 (오디오 데이터)
+   */
   private handleBinaryMessage(buffer: ArrayBuffer): void {
-    if (buffer.byteLength === 0) {
-      console.log('[Audio] 수신 스트리밍 종료');
-      return;
-    }
-
-    const view = new DataView(buffer);
-    let pcmData = buffer;
-
-    // WAV 헤더 확인 ('RIFF' = 0x52494646)
-    if (buffer.byteLength >= 44 && view.getUint32(0, false) === 0x52494646) {
-      try {
-        const parsedChannels = view.getUint16(22, true);
-        const parsedSampleRate = view.getUint32(24, true);
-
-        if (parsedChannels > 0 && parsedChannels <= 2 && 
-            parsedSampleRate >= 8000 && parsedSampleRate <= 96000) {
-          
-          this.currentChannels = parsedChannels;
-          this.currentSampleRate = parsedSampleRate;
-          
-          pcmData = buffer.slice(44); // 헤더 제거
-          console.log(`[Audio] WAV 헤더 감지: ${this.currentChannels}ch, ${this.currentSampleRate}Hz`);
-        }
-      } catch (e) {
-        console.warn('[Audio] 헤더 파싱 중 오류 발생. 기존 설정 유지.');
-      }
-    }
-    
-    if (pcmData.byteLength > 0) {
-      this.enqueueAudioData(pcmData);
-    }
+    // AudioManager에게 위임
+    this.audioManager.handleReceivedAudio(buffer);
   }
 
-  private enqueueAudioData(buffer: ArrayBuffer): void {
-    if (!this.audioContext) return;
-
-    // 1. Int16 -> Float32 변환
-    const int16Data = new Int16Array(buffer);
-    const float32Data = new Float32Array(int16Data.length);
-    for (let i = 0; i < int16Data.length; i++) {
-      float32Data[i] = int16Data[i] / 32768.0;
-    }
-
-    // 2. 실시간 재생 큐에 추가
-    this.audioQueue.push(float32Data);
-
-    // 3. 즉시 처리
-    this.processAudioQueue();
-  }
-
-  private processAudioQueue(): void {
-    if (!this.audioContext) return;
-
-    // 큐에 있는 모든 데이터를 꺼내서 스케줄링
-    while (this.audioQueue.length > 0) {
-      const float32Data = this.audioQueue.shift();
-      if (!float32Data) break;
-
-      this.schedulePlayback(float32Data);
-    }
-  }
-
-  private schedulePlayback(float32Data: Float32Array): void {
-    if (!this.audioContext) return;
-
-    const currentTime = this.audioContext.currentTime;
-
-    // 단순화된 스케줄링:
-    // 1. 예약된 시간이 미래면? -> 예약된 시간에 재생 (매끄러움)
-    // 2. 예약된 시간이 과거면(늦었으면)? -> 지금 당장 재생 (끊김 최소화)
-    const startTime = Math.max(currentTime, this.nextStartTime);
-
-    const channels = this.currentChannels;
-    const frameCount = float32Data.length / channels;
-    const audioBuffer = this.audioContext.createBuffer(channels, frameCount, this.currentSampleRate);
-
-    // 채널 분리 (De-interleaving)
-    for (let channel = 0; channel < channels; channel++) {
-      const channelData = audioBuffer.getChannelData(channel);
-      for (let i = 0; i < frameCount; i++) {
-        channelData[i] = float32Data[i * channels + channel];
-      }
-    }
-
-    const source = this.audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-
-    // Analyser 연결
-    if (!this.analyser) {
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 256;
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    }
-    
-    // GainNode(페이드) 제거하고 직접 연결 (지지직거림 방지)
-    source.connect(this.analyser);
-    this.analyser.connect(this.audioContext.destination);
-
-    source.start(startTime);
-    
-    // 다음 재생 시간 갱신
-    this.nextStartTime = startTime + audioBuffer.duration;
-  }
-
+  /**
+   * WebSocket 연결 상태 확인
+   */
   public getIsConnected(): boolean {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
   }
 
+  /**
+   * 현재 재생 중인 오디오의 RMS 값 반환
+   */
   public getCurrentRms(): number {
-    if (!this.analyser || !this.dataArray) {
-      return 0;
-    }
-
-    this.analyser.getByteFrequencyData(this.dataArray);
-
-    // RMS 계산 (단순 평균)
-    let sum = 0;
-    for (let i = 0; i < this.dataArray.length; i++) {
-      sum += this.dataArray[i];
-    }
-    
-    // 0~1 사이 값으로 정규화 (256은 바이트 최대값)
-    // 감도 조절을 위해 값을 조금 키움 (* 2.5)
-    const average = sum / this.dataArray.length;
-    return (average / 256) * 2.5;
+    return this.audioManager.getCurrentRms();
   }
 
-  public dispose(): void {
+  /**
+   * 모든 리소스 정리
+   */
+  public async dispose(): Promise<void> {
     console.log('[WebSocket] 리소스 정리 중...');
 
-    if (this.audioWorkletNode) {
-      this.audioWorkletNode.disconnect();
-      this.audioWorkletNode.port.close();
-      this.audioWorkletNode = null;
-    }
+    // 오디오 매니저 정리
+    await this.audioManager.dispose();
 
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
-
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
-
+    // WebSocket 정리
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -329,5 +210,12 @@ export class WebSocketManager {
 
     this.isConnected = false;
     console.log('[WebSocket] 리소스 정리 완료');
+  }
+
+  /**
+   * AudioManager 인스턴스 반환 (필요시)
+   */
+  public getAudioManager(): AudioStreamManager {
+    return this.audioManager;
   }
 }
