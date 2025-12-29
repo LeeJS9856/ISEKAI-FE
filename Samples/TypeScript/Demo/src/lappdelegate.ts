@@ -205,7 +205,6 @@ export class LAppDelegate {
    * 감정 입력창의 이벤트를 설정합니다.
    */
   private initializeEmotionInput(): void {
-    /*
     const inputElement = document.getElementById('emotion-input') as HTMLInputElement;
 
     if (inputElement) {
@@ -213,6 +212,10 @@ export class LAppDelegate {
         // Enter 키를 눌렀고, 입력값이 비어있지 않을 때
         if (e.key === 'Enter' && inputElement.value.trim() !== '') {
           const emotionKeyword = inputElement.value.trim();
+          // ▼▼▼ [추가된 코드] 사용자의 입력 텍스트를 채팅창 우측에 표시 ▼▼▼
+          // 0번 뷰(메인 화면)의 ChatManager를 가져와서 내 메시지를 추가합니다.
+          this.getView(0)?.getChatManager().addUserMessage(emotionKeyword);
+          // ▲▲▲ 여기까지 ▲▲▲
 
           // Live2D 매니저를 가져옵니다.
           const live2DManager = this._subdelegates.at(0)?.getLive2DManager();
@@ -231,7 +234,6 @@ export class LAppDelegate {
         }
       });
     }
-    */
   }
   /**
    * 이벤트 리스너를 설정하십시오.

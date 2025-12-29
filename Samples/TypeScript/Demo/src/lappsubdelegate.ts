@@ -131,7 +131,7 @@ export class LAppSubdelegate {
     const gl = this._glManager.getGl();
 
     // 화면 초기화
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
 
     // 깊이 테스트를 활성화합니다
     gl.enable(gl.DEPTH_TEST);

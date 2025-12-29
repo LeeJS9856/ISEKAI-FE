@@ -15,7 +15,7 @@ import { LAppSprite } from './lappsprite';
 import { TextureInfo } from './lapptexturemanager';
 import { TouchManager } from './touchmanager';
 import { LAppSubdelegate } from './lappsubdelegate';
-import { ChatManager } from './chat/chatmanager'; // SubtitleBar에서 ChatManager로 변경
+import { ChatManager } from './components/chatmanager'; // SubtitleBar에서 ChatManager로 변경
 
 /**
  * 그림 수업.
