@@ -21,13 +21,7 @@ export class LAppSprite {
    * @param 높이
    * @param 텍스처 텍스처
    */
-  public constructor(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    textureId: WebGLTexture
-  ) {
+  public constructor(x: number, y: number, width: number, height: number, textureId: WebGLTexture) {
     this._rect = new Rect();
     this._rect.left = x - width * 0.5;
     this._rect.right = x + width * 0.5;
@@ -107,9 +101,7 @@ export class LAppSprite {
 
       // UV 버퍼, 조정 초기화
       {
-        this._uvArray = new Float32Array([
-          1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0
-        ]);
+        this._uvArray = new Float32Array([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
 
         // UV 버퍼를 만듭니다
         this._uvBuffer = gl.createBuffer();
@@ -168,12 +160,7 @@ export class LAppSprite {
 
     // 모델 그리기
     gl.bindTexture(gl.TEXTURE_2D, this._texture);
-    gl.drawElements(
-      gl.TRIANGLES,
-      this._indexArray.length,
-      gl.UNSIGNED_SHORT,
-      0
-    );
+    gl.drawElements(gl.TRIANGLES, this._indexArray.length, gl.UNSIGNED_SHORT, 0);
   }
 
   /**

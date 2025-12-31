@@ -42,43 +42,28 @@ export class LAppWavFileHandler {
     let rms: number;
 
     // 데이터로드되기 전에/파일의 끝에 도달하면 업데이트하지 마십시오.
-    if (
-      this._pcmData == null ||
-      this._sampleOffset >= this._wavFileInfo._samplesPerChannel
-    ) {
+    if (this._pcmData == null || this._sampleOffset >= this._wavFileInfo._samplesPerChannel) {
       this._lastRms = 0.0;
       return false;
     }
 
     // 경과 시간 후에 상태를 유지하십시오
     this._userTimeSeconds += deltaTimeSeconds;
-    goalOffset = Math.floor(
-      this._userTimeSeconds * this._wavFileInfo._samplingRate
-    );
+    goalOffset = Math.floor(this._userTimeSeconds * this._wavFileInfo._samplingRate);
     if (goalOffset > this._wavFileInfo._samplesPerChannel) {
       goalOffset = this._wavFileInfo._samplesPerChannel;
     }
 
     // rms 計測
     rms = 0.0;
-    for (
-      let channelCount = 0;
-      channelCount < this._wavFileInfo._numberOfChannels;
-      channelCount++
-    ) {
-      for (
-        let sampleCount = this._sampleOffset;
-        sampleCount < goalOffset;
-        sampleCount++
-      ) {
+    for (let channelCount = 0; channelCount < this._wavFileInfo._numberOfChannels; channelCount++) {
+      for (let sampleCount = this._sampleOffset; sampleCount < goalOffset; sampleCount++) {
         const pcm = this._pcmData[channelCount][sampleCount];
         rms += pcm * pcm;
       }
     }
     rms = Math.sqrt(
-      rms /
-        (this._wavFileInfo._numberOfChannels *
-          (goalOffset - this._sampleOffset))
+      rms / (this._wavFileInfo._numberOfChannels * (goalOffset - this._sampleOffset))
     );
 
     this._lastRms = rms;
@@ -118,17 +103,12 @@ export class LAppWavFileHandler {
 
       const asyncWavFileManager = (async () => {
         this._byteReader._fileByte = await asyncFileLoad();
-        this._byteReader._fileDataView = new DataView(
-          this._byteReader._fileByte
-        );
+        this._byteReader._fileDataView = new DataView(this._byteReader._fileByte);
         this._byteReader._fileSize = this._byteReader._fileByte.byteLength;
         this._byteReader._readOffset = 0;
 
         // 파일로드가 실패했거나 첫 번째 서명 "리프"에 맞는 크기가없는 경우 실패
-        if (
-          this._byteReader._fileByte == null ||
-          this._byteReader._fileSize < 4
-        ) {
+        if (this._byteReader._fileByte == null || this._byteReader._fileSize < 4) {
           resolveValue(false);
           return;
         }
@@ -162,18 +142,15 @@ export class LAppWavFileHandler {
             throw new Error('File is not linear PCM.');
           }
           // 채널 수
-          this._wavFileInfo._numberOfChannels =
-            this._byteReader.get16LittleEndian();
+          this._wavFileInfo._numberOfChannels = this._byteReader.get16LittleEndian();
           // 샘플링 속도
-          this._wavFileInfo._samplingRate =
-            this._byteReader.get32LittleEndian();
+          this._wavFileInfo._samplingRate = this._byteReader.get32LittleEndian();
           // 데이터 속도 [바이트/초] (건너 뛰기)
           this._byteReader.get32LittleEndian();
           // 블록 크기 (읽기 건너 뛰기)
           this._byteReader.get16LittleEndian();
           // 양자화 된 비트 수
-          this._wavFileInfo._bitsPerSample =
-            this._byteReader.get16LittleEndian();
+          this._wavFileInfo._bitsPerSample = this._byteReader.get16LittleEndian();
           // FMT 청크의 확장 부분을 건너 뜁니다
           if (fmtChunkSize > 16) {
             this._byteReader._readOffset += fmtChunkSize - 16;
@@ -183,8 +160,7 @@ export class LAppWavFileHandler {
             !this._byteReader.getCheckSignature('data') &&
             this._byteReader._readOffset < this._byteReader._fileSize
           ) {
-            this._byteReader._readOffset +=
-              this._byteReader.get32LittleEndian() + 4;
+            this._byteReader._readOffset += this._byteReader.get32LittleEndian() + 4;
           }
           // 파일에 "Data"청크가 나타나지 않았습니다
           if (this._byteReader._readOffset >= this._byteReader._fileSize) {
@@ -196,8 +172,7 @@ export class LAppWavFileHandler {
             const dataChunkSize = this._byteReader.get32LittleEndian();
             this._wavFileInfo._samplesPerChannel =
               (dataChunkSize * 8) /
-              (this._wavFileInfo._bitsPerSample *
-                this._wavFileInfo._numberOfChannels);
+              (this._wavFileInfo._bitsPerSample * this._wavFileInfo._numberOfChannels);
           }
           // 領域確保
           this._pcmData = new Array(this._wavFileInfo._numberOfChannels);
@@ -206,9 +181,7 @@ export class LAppWavFileHandler {
             channelCount < this._wavFileInfo._numberOfChannels;
             channelCount++
           ) {
-            this._pcmData[channelCount] = new Float32Array(
-              this._wavFileInfo._samplesPerChannel
-            );
+            this._pcmData[channelCount] = new Float32Array(this._wavFileInfo._samplesPerChannel);
           }
           // 파형 데이터의 획득
           for (
@@ -291,11 +264,7 @@ export class LAppWavFileHandler {
   }
 
   public releasePcmData(): void {
-    for (
-      let channelCount = 0;
-      channelCount < this._wavFileInfo._numberOfChannels;
-      channelCount++
-    ) {
+    for (let channelCount = 0; channelCount < this._wavFileInfo._numberOfChannels; channelCount++) {
       this._pcmData[channelCount] = null;
     }
     delete this._pcmData;

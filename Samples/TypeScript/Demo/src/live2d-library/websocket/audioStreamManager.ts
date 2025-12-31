@@ -3,14 +3,14 @@ export class AudioStreamManager {
   private sendAudioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private audioWorkletNode: AudioWorkletNode | null = null;
-  
+
   // 수신용 (서버 -> 스피커)
   private receiveAudioContext: AudioContext | null = null;
   private audioQueue: Float32Array[] = [];
   private nextStartTime: number = 0;
   private analyser: AnalyserNode | null = null;
   private dataArray: Uint8Array | null = null;
-  
+
   // 현재 수신 오디오 설정
   private currentChannels: number = 1;
   private currentSampleRate: number = 24000;
@@ -28,9 +28,7 @@ export class AudioStreamManager {
    * 마이크 스트리밍 시작 (송신) - VAD + 노이즈 게이트 적용
    * @param onAudioData - 오디오 데이터를 받을 콜백 함수
    */
-  public async startMicrophoneStreaming(
-    onAudioData: (data: Float32Array) => void
-  ): Promise<void> {
+  public async startMicrophoneStreaming(onAudioData: (data: Float32Array) => void): Promise<void> {
     if (this.sendAudioContext && this.mediaStream) {
       console.log('[Audio] 이미 마이크 스트리밍 중입니다.');
       return;
@@ -46,8 +44,8 @@ export class AudioStreamManager {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true, // 브라우저 내장 노이즈 억제
-          autoGainControl: true,
-        },
+          autoGainControl: true
+        }
       });
 
       console.log('[Audio] 마이크 접근 허용됨');
@@ -64,10 +62,7 @@ export class AudioStreamManager {
         await this.sendAudioContext.audioWorklet.addModule('vad-audio-processor.js');
       }
 
-      this.audioWorkletNode = new AudioWorkletNode(
-        this.sendAudioContext,
-        'vad-audio-processor'
-      );
+      this.audioWorkletNode = new AudioWorkletNode(this.sendAudioContext, 'vad-audio-processor');
 
       // VAD 설정 전송
       this.audioWorkletNode.port.postMessage({
@@ -77,7 +72,7 @@ export class AudioStreamManager {
       });
 
       // 오디오 데이터 및 통계 수신
-      this.audioWorkletNode.port.onmessage = (event) => {
+      this.audioWorkletNode.port.onmessage = event => {
         if (event.data.type === 'stats') {
           this.isVoiceActive = event.data.isActive;
           this.updateEnergyHistory(event.data.energy);
@@ -153,9 +148,10 @@ export class AudioStreamManager {
     currentEnergy: number;
     avgEnergy: number;
   } {
-    const avgEnergy = this.energyHistory.length > 0
-      ? this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length
-      : 0;
+    const avgEnergy =
+      this.energyHistory.length > 0
+        ? this.energyHistory.reduce((a, b) => a + b, 0) / this.energyHistory.length
+        : 0;
 
     return {
       isActive: this.isVoiceActive,
@@ -175,7 +171,7 @@ export class AudioStreamManager {
     }
 
     if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream.getTracks().forEach(track => track.stop());
       this.mediaStream = null;
     }
 
@@ -193,12 +189,12 @@ export class AudioStreamManager {
   public initializePlayback(): void {
     if (!this.receiveAudioContext) {
       this.receiveAudioContext = new AudioContext({ sampleRate: 48000 });
-      
+
       // Analyser 초기화
       this.analyser = this.receiveAudioContext.createAnalyser();
       this.analyser.fftSize = 256;
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-      
+
       console.log('[Audio] 재생 컨텍스트 초기화 완료');
     }
   }
@@ -311,7 +307,7 @@ export class AudioStreamManager {
       return 0;
     }
 
-    this.analyser.getByteFrequencyData(this.dataArray as Uint8Array);
+    this.analyser.getByteFrequencyData(this.dataArray);
 
     let sum = 0;
     for (let i = 0; i < this.dataArray.length; i++) {

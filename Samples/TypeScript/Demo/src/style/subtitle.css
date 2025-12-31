@@ -33,7 +33,7 @@
   background-color: rgba(255, 255, 255, 0.9); /* 반투명 흰색 배경 */
   border-radius: 15px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  padding: 30px 25px 20px 25px; 
+  padding: 30px 25px 20px 25px;
   box-sizing: border-box;
   opacity: 1;
   transition: opacity 0.3s ease-in-out; /* 부드러운 등장/사라짐 효과 */
@@ -55,22 +55,22 @@
   transform: translateY(-50%);
   background-color: white;
   border: 1px solid #ddd;
-  border-radius:20px;
+  border-radius: 20px;
   padding: 8px 16px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   z-index: 11;
-  font-weight:700;
-  font-size:1.1em;
+  font-weight: 700;
+  font-size: 1.1em;
   color: #333;
 }
 #charactor-name::before {
-    content: '';
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background-color: #4a90e2;
-    margin-right: 10px;
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #4a90e2;
+  margin-right: 10px;
 }
 
 /* 자막 메시지 스타일 */
@@ -78,7 +78,7 @@
   font-size: 1.1em;
   color: #555;
   line-height: 1.5;
-  font-weight:500;
+  font-weight: 500;
 }
 
 /* 입력창 컨테이너 스타일 */
@@ -91,7 +91,7 @@
   max-width: 950px;
   z-index: 11; /* 자막바보다도 위에 오도록 설정 */
 }
-  
+
 /* 입력 필드 스타일 */
 #emotion-input {
   width: 100%;
@@ -103,7 +103,9 @@
   background-color: rgba(255, 255, 255, 0.95);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   outline: none; /* 클릭 시 파란색 테두리 제거 */
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 /* 입력 필드에 포커스될 때 스타일 */

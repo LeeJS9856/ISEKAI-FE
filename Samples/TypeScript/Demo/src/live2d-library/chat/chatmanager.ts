@@ -55,6 +55,10 @@ export class ChatManager {
 
   public toggle(): void {
     this._isManuallyHidden = !this._isManuallyHidden;
-    this._isManuallyHidden ? this.hide() : this.show();
+    if (this._isManuallyHidden) {
+      this.hide();
+    } else {
+      this.show();
+    }
   }
 }

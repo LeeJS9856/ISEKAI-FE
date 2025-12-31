@@ -52,19 +52,14 @@ export class LAppTextureManager {
       ite.notEqual(this._textures.end());
       ite.preIncrement()
     ) {
-      if (
-        ite.ptr().fileName == fileName &&
-        ite.ptr().usePremultply == usePremultiply
-      ) {
+      if (ite.ptr().fileName == fileName && ite.ptr().usePremultply == usePremultiply) {
         // 두 번째로 캐시가 사용됩니다 (대기 시간 없음)
         // WebKit은 동일한 이미지의 Onload를 다시 호출하려면 Re-Instance가 필요합니다.
         // 詳細 ： https : //stackoverflow.com/a/5024181
         ite.ptr().img = new Image();
-        ite
-          .ptr()
-          .img.addEventListener('load', (): void => callback(ite.ptr()), {
-            passive: true
-          });
+        ite.ptr().img.addEventListener('load', (): void => callback(ite.ptr()), {
+          passive: true
+        });
         ite.ptr().img.src = fileName;
         return;
       }
@@ -79,9 +74,7 @@ export class LAppTextureManager {
         const tex: WebGLTexture = this._glManager.getGl().createTexture();
 
         // 텍스처를 선택합니다
-        this._glManager
-          .getGl()
-          .bindTexture(this._glManager.getGl().TEXTURE_2D, tex);
+        this._glManager.getGl().bindTexture(this._glManager.getGl().TEXTURE_2D, tex);
 
         // 텍스처에 픽셀을 씁니다
         this._glManager
@@ -103,10 +96,7 @@ export class LAppTextureManager {
         if (usePremultiply) {
           this._glManager
             .getGl()
-            .pixelStorei(
-              this._glManager.getGl().UNPACK_PREMULTIPLY_ALPHA_WEBGL,
-              1
-            );
+            .pixelStorei(this._glManager.getGl().UNPACK_PREMULTIPLY_ALPHA_WEBGL, 1);
         }
 
         // 텍스처에 픽셀을 씁니다
@@ -122,14 +112,10 @@ export class LAppTextureManager {
           );
 
         // mipmap을 생성합니다
-        this._glManager
-          .getGl()
-          .generateMipmap(this._glManager.getGl().TEXTURE_2D);
+        this._glManager.getGl().generateMipmap(this._glManager.getGl().TEXTURE_2D);
 
         // 텍스처 바인드
-        this._glManager
-          .getGl()
-          .bindTexture(this._glManager.getGl().TEXTURE_2D, null);
+        this._glManager.getGl().bindTexture(this._glManager.getGl().TEXTURE_2D, null);
 
         const textureInfo: TextureInfo = new TextureInfo();
         if (textureInfo != null) {
@@ -148,6 +134,10 @@ export class LAppTextureManager {
       },
       { passive: true }
     );
+    // 이미지 로드 에러 처리 추가
+    img.addEventListener('error', event => {
+      console.error(`[LAppTextureManager] Failed to load image: ${fileName}`, event);
+    });
     img.src = fileName;
   }
 

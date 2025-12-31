@@ -12,7 +12,7 @@ export class WebSocketManager {
   private nextStartTime: number = 0;
   private analyser: AnalyserNode | null = null;
   private dataArray: Uint8Array | null = null;
-  
+
   // 현재 오디오 설정 저장용 (첫 패킷에서 읽은 값 유지)
   private currentChannels: number = 1;
   private currentSampleRate: number = 24000;
@@ -49,7 +49,7 @@ export class WebSocketManager {
           resolve();
         };
 
-        this.ws.onerror = (error) => {
+        this.ws.onerror = error => {
           console.error('[WebSocket] 에러:', error);
           this.isConnected = false;
         };
@@ -60,7 +60,7 @@ export class WebSocketManager {
           this.attemptReconnect();
         };
 
-        this.ws.onmessage = (event) => {
+        this.ws.onmessage = event => {
           if (typeof event.data === 'string') {
             this.handleServerMessage(event.data);
           } else if (event.data instanceof ArrayBuffer) {
@@ -89,7 +89,7 @@ export class WebSocketManager {
     );
 
     setTimeout(() => {
-      this.initialize().catch((error) => {
+      this.initialize().catch(error => {
         console.error('[WebSocket] 재연결 실패:', error);
       });
     }, this.reconnectDelay);
@@ -104,7 +104,7 @@ export class WebSocketManager {
       this.audioManager.initializePlayback();
 
       // 마이크 스트리밍 시작
-      await this.audioManager.startMicrophoneStreaming((audioData) => {
+      await this.audioManager.startMicrophoneStreaming(audioData => {
         this.sendAudioData(audioData);
       });
 
@@ -151,27 +151,27 @@ export class WebSocketManager {
       const message = JSON.parse(data);
 
       // 1. AI의 답변 자막 처리
-      if (message.messageType === "SUBTITLE" && message.content?.text) {
+      if (message.messageType === 'SUBTITLE' && message.content?.text) {
         const subtitleText = message.content.text;
         const live2DManager = LAppDelegate.getInstance().getLive2DManager();
         if (live2DManager) {
-          const modelName = live2DManager.getCurrentModelDisplayName();
-          live2DManager.showSubtitleMessage(modelName, subtitleText); // AI 말풍선 추가
+          // const modelName = live2DManager.getCurrentModelDisplayName();
+          // live2DManager.showSubtitleMessage(modelName, subtitleText); // AI 말풍선 추가
         }
-      } 
-      
+      }
+
       // 2. 추가: 내가 말한 음성 인식 결과(STT) 처리
       // 서버에서 보내주는 메시지 구조에 맞춰 messageType을 확인합니다.
-      else if (message.messageType === "USER_STT" && message.content?.text) {
+      else if (message.messageType === 'USER_STT' && message.content?.text) {
         const userText = message.content.text;
         const appDelegate = LAppDelegate.getInstance();
-        
+
         // 에러가 나던 줄을 삭제하고 아래와 같이 수정합니다.
         const view = appDelegate.getView(); // 1단계에서 만든 메서드 사용
-        
+
         if (view) {
           // LAppView에서 ChatManager를 가져와 사용자 메시지를 추가합니다.
-          view.getChatManager().addUserMessage(userText); 
+          view.getChatManager().addUserMessage(userText);
         } else {
           console.warn('[WebSocket] View를 찾을 수 없어 사용자 메시지를 표시하지 못했습니다.');
         }
