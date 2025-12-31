@@ -29,25 +29,34 @@ export class LAppSubdelegate {
     this._captured = false;
   }
 
-  /**
-   * 소멸자 동등한 처리
-   */
+
+
   public release(): void {
-    this._resizeObserver.unobserve(this._canvas);
-    this._resizeObserver.disconnect();
-    this._resizeObserver = null;
+    if (this._resizeObserver) {
+      this._resizeObserver.unobserve(this._canvas);
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
 
-    this._live2dManager.release();
-    this._live2dManager = null;
+    if (this._live2dManager) {
+      this._live2dManager.release();
+      this._live2dManager = null;
+    }
 
-    this._view.release();
-    this._view = null;
+    if (this._view) {
+      this._view.release();
+      this._view = null;
+    }
 
-    this._textureManager.release();
-    this._textureManager = null;
+    if (this._textureManager) {
+      this._textureManager.release();
+      this._textureManager = null;
+    }
 
-    this._glManager.release();
-    this._glManager = null;
+    if (this._glManager) {
+      this._glManager.release();
+      this._glManager = null;
+    }
   }
 
   /**
@@ -81,7 +90,7 @@ export class LAppSubdelegate {
 
     // AppView 초기화
     this._view.initialize(this);
-    this._view.initializeSprite();
+    // this._view.initializeSprite(); // 스프라이트 초기화 제거
 
     this._live2dManager.initialize(this);
 
@@ -101,8 +110,10 @@ export class LAppSubdelegate {
    */
   public onResize(): void {
     this.resizeCanvas();
+    // resizeObserverCallback에서 set한 view size 반영을 위해 재초기화 하거나,
+    // view 내부에서 Resize 처리를 할 수 있도록 합니다.
     this._view.initialize(this);
-    this._view.initializeSprite();
+    // this._view.initializeSprite();
   }
 
   private resizeObserverCallback(
@@ -118,7 +129,7 @@ export class LAppSubdelegate {
    * 루프 처리
    */
   public update(): void {
-    if (this._glManager.getGl().isContextLost()) {
+    if (!this._glManager || !this._glManager.getGl() || this._glManager.getGl().isContextLost()) {
       return;
     }
 
@@ -148,7 +159,9 @@ export class LAppSubdelegate {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     // 업데이트 된 도면
-    this._view.render();
+    if (this._view) {
+      this._view.render();
+    }
   }
 
   /**
@@ -238,11 +251,11 @@ export class LAppSubdelegate {
    * 화면을 채우도록 캔버스 크기를 조정하십시오.
    */
   private resizeCanvas(): void {
+    if (!this._canvas) return;
     this._canvas.width = this._canvas.clientWidth * window.devicePixelRatio;
     this._canvas.height = this._canvas.clientHeight * window.devicePixelRatio;
 
     const gl = this._glManager.getGl();
-
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   }
 

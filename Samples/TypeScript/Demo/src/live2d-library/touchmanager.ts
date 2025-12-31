@@ -122,12 +122,7 @@ export class TouchManager {
    * @return Flick 거리
    */
   public getFlickDistance(): number {
-    return this.calculateDistance(
-      this._startX,
-      this._startY,
-      this._lastX,
-      this._lastY
-    );
+    return this.calculateDistance(this._startX, this._startY, this._lastX, this._lastY);
   }
 
   /**
@@ -138,12 +133,7 @@ export class TouchManager {
    * @param x2 두 번째 터치 된 화면에서 x 값
    * @param y2 두 번째 터치 된 화면에서 Y의 값
    */
-  public calculateDistance(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number
-  ): number {
+  public calculateDistance(x1: number, y1: number, x2: number, y2: number): number {
     return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
   }
 
@@ -164,9 +154,7 @@ export class TouchManager {
     const sign: number = v1 > 0.0 ? 1.0 : -1.0;
     const absoluteValue1 = Math.abs(v1);
     const absoluteValue2 = Math.abs(v2);
-    return (
-      sign * (absoluteValue1 < absoluteValue2 ? absoluteValue1 : absoluteValue2)
-    );
+    return sign * (absoluteValue1 < absoluteValue2 ? absoluteValue1 : absoluteValue2);
   }
 
   _startY: number; // 터치를 시작했을 때의 x 값

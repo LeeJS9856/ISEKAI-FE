@@ -7,10 +7,7 @@
 
 import { CubismDefaultParameterId } from '@framework/cubismdefaultparameterid';
 import { CubismModelSettingJson } from '@framework/cubismmodelsettingjson';
-import {
-  BreathParameterData,
-  CubismBreath
-} from '@framework/effect/cubismbreath';
+import { BreathParameterData, CubismBreath } from '@framework/effect/cubismbreath';
 import { CubismEyeBlink } from '@framework/effect/cubismeyeblink';
 import { ICubismModelSetting } from '@framework/icubismmodelsetting';
 import { CubismIdHandle } from '@framework/id/cubismid';
@@ -31,11 +28,7 @@ import { csmMap } from '@framework/type/csmmap';
 import { csmRect } from '@framework/type/csmrectf';
 import { csmString } from '@framework/type/csmstring';
 import { csmVector } from '@framework/type/csmvector';
-import {
-  CSM_ASSERT,
-  CubismLogError,
-  CubismLogInfo
-} from '@framework/utils/cubismdebug';
+import { CSM_ASSERT, CubismLogError, CubismLogInfo } from '@framework/utils/cubismdebug';
 
 import * as LAppDefine from './lappdefine';
 import { LAppPal } from './lapppal';
@@ -44,6 +37,13 @@ import { LAppWavFileHandler } from './lappwavfilehandler';
 import { CubismMoc } from '@framework/model/cubismmoc';
 import { LAppDelegate } from './lappdelegate';
 import { LAppSubdelegate } from './lappsubdelegate';
+
+export interface ModelLayout {
+  scaleX?: number;
+  scaleY?: number;
+  x?: number;
+  y?: number;
+}
 
 enum LoadStep {
   LoadAssets,
@@ -71,11 +71,24 @@ enum LoadStep {
   CompleteSetup
 }
 
+// 헬퍼 함수: 경로에서 파일명(혹은 상대 경로)만 추출하거나, _modelHomeDir를 제거하는 로직이 필요할 수 있음.
+// 여기서는 간단히 getFile 내부에서 처리.
+
+
 /**
  * 사용자가 실제로 사용할 모델의 구현 클래스
  * 모델 생성, 기능 구성 요소 생성, 업데이트 처리 및 렌더링을 요구합니다.
  */
 export class LAppModel extends CubismUserModel {
+  /**
+   * 레이아웃 설정 (스케일, 위치 등)
+   */
+  private _layoutConfig: ModelLayout | null = null;
+
+  public setLayoutConfig(config: ModelLayout): void {
+      this._layoutConfig = config;
+  }
+
   /**
    * Model3.json이있는 디렉토리 및 파일 경로에서 모델을 생성합니다.
    * @param dir
@@ -84,8 +97,7 @@ export class LAppModel extends CubismUserModel {
   public loadAssets(dir: string, fileName: string): void {
     this._modelHomeDir = dir;
 
-    fetch(`${this._modelHomeDir}${fileName}`)
-      .then(response => response.arrayBuffer())
+    this.getFile(fileName)
       .then(arrayBuffer => {
         const setting: ICubismModelSetting = new CubismModelSettingJson(
           arrayBuffer,
@@ -96,11 +108,52 @@ export class LAppModel extends CubismUserModel {
         this._state = LoadStep.LoadModel;
 
         // 결과 저장
-        this.setupModel(setting);
+         this.setupModel(setting);
       })
       .catch(error => {
-        // model33.json을로드 할 때 오류가 발생할 때 그리기가 불가능합니다. 설정하지 않고 오류를 잡고 아무것도하지 않습니다.
-        CubismLogError(`Failed to load file ${this._modelHomeDir}${fileName}`);
+        CubismLogError(`Failed to load header file ${fileName}`);
+      });
+  }
+
+  /**
+   * Zip 파일 등에서 메모리로 로드된 리소스를 설정합니다.
+   * @param resources 파일 경로(상대 경로)를 키로 하고 ArrayBuffer를 값으로 갖는 맵
+   */
+  public preLoadResources(resources: Map<string, ArrayBuffer>): void {
+      this._resources = resources;
+  }
+
+  /**
+   * 파일 로드 헬퍼 (네트워크 또는 메모리)
+   */
+  private getFile(fileName: string): Promise<ArrayBuffer> {
+      // 1. 메모리 리소스가 있으면 우선 검색
+      if (this._resources) {
+          // _modelHomeDir와 fileName을 결합하여 맵 키로 사용
+          let targetPath = fileName;
+          if (this._modelHomeDir && !fileName.startsWith(this._modelHomeDir)) {
+              targetPath = this._modelHomeDir + fileName;
+          }
+          
+          if (this._resources.has(targetPath)) {
+              return Promise.resolve(this._resources.get(targetPath)!);
+          }
+          
+          // 혹시 fileName 그대로 있을 수도 있으니 확인 (루트 경로 등)
+          if (this._resources.has(fileName)) {
+               return Promise.resolve(this._resources.get(fileName)!);
+          }
+
+           console.warn(`[LAppModel] Resource not found in memory map: ${targetPath} or ${fileName}`);
+      }
+
+
+      // 2. 네트워크 페치
+      return fetch(`${this._modelHomeDir}${fileName}`).then(response => {
+          if (!response.ok) {
+              throw new Error(`Network response was not ok: ${response.status}`);
+          }
+          return response.arrayBuffer();
       });
   }
 
@@ -120,23 +173,16 @@ export class LAppModel extends CubismUserModel {
     if (this._modelSetting.getModelFileName() != '') {
       const modelFileName = this._modelSetting.getModelFileName();
 
-      fetch(`${this._modelHomeDir}${modelFileName}`)
-        .then(response => {
-          if (response.ok) {
-            return response.arrayBuffer();
-          } else if (response.status >= 400) {
-            CubismLogError(
-              `Failed to load file ${this._modelHomeDir}${modelFileName}`
-            );
-            return new ArrayBuffer(0);
-          }
-        })
+      this.getFile(modelFileName)
         .then(arrayBuffer => {
           this.loadModel(arrayBuffer, this._mocConsistency);
           this._state = LoadStep.LoadExpression;
 
           // 콜백
           loadCubismExpression();
+        })
+        .catch(err => {
+            CubismLogError(`Failed to load file ${modelFileName}`);
         });
 
       this._state = LoadStep.WaitLoadModel;
@@ -151,21 +197,9 @@ export class LAppModel extends CubismUserModel {
 
         for (let i = 0; i < count; i++) {
           const expressionName = this._modelSetting.getExpressionName(i);
-          const expressionFileName =
-            this._modelSetting.getExpressionFileName(i);
+          const expressionFileName = this._modelSetting.getExpressionFileName(i);
 
-          fetch(`${this._modelHomeDir}${expressionFileName}`)
-            .then(response => {
-              if (response.ok) {
-                return response.arrayBuffer();
-              } else if (response.status >= 400) {
-                CubismLogError(
-                  `Failed to load file ${this._modelHomeDir}${expressionFileName}`
-                );
-                // 파일이 존재하지 않더라도 응답은 null을 반환하지 않으므로 빈 배열 버퍼로 지원됩니다.
-                return new ArrayBuffer(0);
-              }
-            })
+          this.getFile(expressionFileName)
             .then(arrayBuffer => {
               const motion: ACubismMotion = this.loadExpression(
                 arrayBuffer,
@@ -174,9 +208,7 @@ export class LAppModel extends CubismUserModel {
               );
 
               if (this._expressions.getValue(expressionName) != null) {
-                ACubismMotion.delete(
-                  this._expressions.getValue(expressionName)
-                );
+                ACubismMotion.delete(this._expressions.getValue(expressionName));
                 this._expressions.setValue(expressionName, null);
               }
 
@@ -190,6 +222,13 @@ export class LAppModel extends CubismUserModel {
                 // 콜백
                 loadCubismPhysics();
               }
+            })
+            .catch(() => {
+                 CubismLogError(`Failed to load file ${expressionFileName}`);
+                 // Skip or handle error
+                 // In previous code it silently failed or returned empty buffer.
+                 // For now, let's just proceed or stuck?
+                 // Original logic returned empty buffer on 404.
             });
         }
         this._state = LoadStep.WaitLoadExpression;
@@ -206,17 +245,7 @@ export class LAppModel extends CubismUserModel {
       if (this._modelSetting.getPhysicsFileName() != '') {
         const physicsFileName = this._modelSetting.getPhysicsFileName();
 
-        fetch(`${this._modelHomeDir}${physicsFileName}`)
-          .then(response => {
-            if (response.ok) {
-              return response.arrayBuffer();
-            } else if (response.status >= 400) {
-              CubismLogError(
-                `Failed to load file ${this._modelHomeDir}${physicsFileName}`
-              );
-              return new ArrayBuffer(0);
-            }
-          })
+        this.getFile(physicsFileName)
           .then(arrayBuffer => {
             this.loadPhysics(arrayBuffer, arrayBuffer.byteLength);
 
@@ -224,6 +253,9 @@ export class LAppModel extends CubismUserModel {
 
             // 콜백
             loadCubismPose();
+          })
+          .catch(() => {
+              CubismLogError(`Failed to load file ${physicsFileName}`);
           });
         this._state = LoadStep.WaitLoadPhysics;
       } else {
@@ -239,17 +271,7 @@ export class LAppModel extends CubismUserModel {
       if (this._modelSetting.getPoseFileName() != '') {
         const poseFileName = this._modelSetting.getPoseFileName();
 
-        fetch(`${this._modelHomeDir}${poseFileName}`)
-          .then(response => {
-            if (response.ok) {
-              return response.arrayBuffer();
-            } else if (response.status >= 400) {
-              CubismLogError(
-                `Failed to load file ${this._modelHomeDir}${poseFileName}`
-              );
-              return new ArrayBuffer(0);
-            }
-          })
+        this.getFile(poseFileName)
           .then(arrayBuffer => {
             this.loadPose(arrayBuffer, arrayBuffer.byteLength);
 
@@ -257,6 +279,9 @@ export class LAppModel extends CubismUserModel {
 
             // 콜백
             setupEyeBlink();
+          })
+          .catch(() => {
+              CubismLogError(`Failed to load file ${poseFileName}`);
           });
         this._state = LoadStep.WaitLoadPose;
       } else {
@@ -297,9 +322,7 @@ export class LAppModel extends CubismUserModel {
       );
       breathParameters.pushBack(
         new BreathParameterData(
-          CubismFramework.getIdManager().getId(
-            CubismDefaultParameterId.ParamBreath
-          ),
+          CubismFramework.getIdManager().getId(CubismDefaultParameterId.ParamBreath),
           0.5,
           0.5,
           3.2345,
@@ -319,17 +342,7 @@ export class LAppModel extends CubismUserModel {
       if (this._modelSetting.getUserDataFile() != '') {
         const userDataFile = this._modelSetting.getUserDataFile();
 
-        fetch(`${this._modelHomeDir}${userDataFile}`)
-          .then(response => {
-            if (response.ok) {
-              return response.arrayBuffer();
-            } else if (response.status >= 400) {
-              CubismLogError(
-                `Failed to load file ${this._modelHomeDir}${userDataFile}`
-              );
-              return new ArrayBuffer(0);
-            }
-          })
+        this.getFile(userDataFile)
           .then(arrayBuffer => {
             this.loadUserData(arrayBuffer, arrayBuffer.byteLength);
 
@@ -337,6 +350,9 @@ export class LAppModel extends CubismUserModel {
 
             // 콜백
             setupEyeBlinkIds();
+          })
+          .catch(() => {
+               CubismLogError(`Failed to load file ${userDataFile}`);
           });
 
         this._state = LoadStep.WaitLoadUserData;
@@ -350,13 +366,10 @@ export class LAppModel extends CubismUserModel {
 
     // EyeBlinkids
     const setupEyeBlinkIds = (): void => {
-      const eyeBlinkIdCount: number =
-        this._modelSetting.getEyeBlinkParameterCount();
+      const eyeBlinkIdCount: number = this._modelSetting.getEyeBlinkParameterCount();
 
       for (let i = 0; i < eyeBlinkIdCount; ++i) {
-        this._eyeBlinkIds.pushBack(
-          this._modelSetting.getEyeBlinkParameterId(i)
-        );
+        this._eyeBlinkIds.pushBack(this._modelSetting.getEyeBlinkParameterId(i));
       }
 
       this._state = LoadStep.SetupLipSyncIds;
@@ -386,23 +399,21 @@ export class LAppModel extends CubismUserModel {
         CubismLogError('Failed to setupLayout().');
         return;
       }
-      
+
       this._modelSetting.getLayoutMap(layout);
       this._modelMatrix.setupFromLayout(layout);
-      // --- 💡 여기에 코드 추가 ---
-      // this._modelHomeDir는 loadAssets에서 설정된 모델 경로입니다 (예: ../../Resources/HoshinoAi/)
-      // 경로에 'HoshinoAi'가 포함되어 있으면 해당 모델의 스케일만 2배로 키웁니다.
-      if (this._modelHomeDir.includes('HoshinoAi')) {
-        // 숫자를 조절하여 원하는 크기를 맞추세요. (예: 2.0배)
-        this._modelMatrix.scale(2.5, 2.5);
-        // 좌측으로 이동
-        this._modelMatrix.translate(-0.8, -0.85);
+      this._modelSetting.getLayoutMap(layout);
+      this._modelMatrix.setupFromLayout(layout);
+
+      // 외부에서 주입된 레이아웃 설정 적용
+      if (this._layoutConfig) {
+        if (this._layoutConfig.scaleX !== undefined && this._layoutConfig.scaleY !== undefined) {
+             this._modelMatrix.scale(this._layoutConfig.scaleX, this._layoutConfig.scaleY);
+        }
+        if (this._layoutConfig.x !== undefined && this._layoutConfig.y !== undefined) {
+             this._modelMatrix.translate(this._layoutConfig.x, this._layoutConfig.y);
+        }
       }
-      // ANIYA 등 다른 모델도 왼쪽 배치가 필요하다면 아래와 같이 추가 가능합니다.
-      if (this._modelHomeDir.includes('ANIYA')) {
-        this._modelMatrix.translate(-0.8, 0.0);
-      }
-      // --- 여기까지 추가 ---
 
       this._state = LoadStep.LoadMotion;
 
@@ -459,11 +470,7 @@ export class LAppModel extends CubismUserModel {
       // 텍스처로드의 경우
       const textureCount: number = this._modelSetting.getTextureCount();
 
-      for (
-        let modelTextureNumber = 0;
-        modelTextureNumber < textureCount;
-        modelTextureNumber++
-      ) {
+      for (let modelTextureNumber = 0; modelTextureNumber < textureCount; modelTextureNumber++) {
         // 텍스처 이름이 비어 있으면 부하 바인딩 건너 뛰기
         if (this._modelSetting.getTextureFileName(modelTextureNumber) == '') {
           console.log('getTextureFileName null');
@@ -471,27 +478,51 @@ export class LAppModel extends CubismUserModel {
         }
 
         // WebGL의 텍스처 유닛에 텍스처를로드합니다
-        let texturePath =
-          this._modelSetting.getTextureFileName(modelTextureNumber);
+        let texturePath = this._modelSetting.getTextureFileName(modelTextureNumber);
         texturePath = this._modelHomeDir + texturePath;
+        
+        // 주의: LAppTextureManager는 Image 객체를 생성하기 위해 path를 씁니다.
+        // 메모리 로딩 시에는 Blob URL 등을 사용해야 합니다.
+        
+        // 여기서 분기 처리가 필요합니다.
+        if (this._resources && this._resources.has(texturePath)) {
+             // 메모리에서 로드
+             const buffer = this._resources.get(texturePath)!;
+             const blob = new Blob([buffer]);
+             const url = URL.createObjectURL(blob);
+             
+              const onLoad = (textureInfo: TextureInfo): void => {
+                this.getRenderer().bindTexture(modelTextureNumber, textureInfo.id);
+                this._textureCount++;
+                URL.revokeObjectURL(url); // 메모리 해제
 
-        // 부하 완료시 호출 할 콜백 함수
-        const onLoad = (textureInfo: TextureInfo): void => {
-          this.getRenderer().bindTexture(modelTextureNumber, textureInfo.id);
+                if (this._textureCount >= textureCount) {
+                    this._state = LoadStep.CompleteSetup;
+                }
+              };
+              
+             this._subdelegate
+                .getTextureManager()
+                .createTextureFromPngFile(url, usePremultiply, onLoad);
+             this.getRenderer().setIsPremultipliedAlpha(usePremultiply);
+             
+        } else {
+             // 기존 네트워크 로드
+             const fullPath = this._modelHomeDir + texturePath;
+             const onLoad = (textureInfo: TextureInfo): void => {
+                this.getRenderer().bindTexture(modelTextureNumber, textureInfo.id);
+                this._textureCount++;
 
-          this._textureCount++;
-
-          if (this._textureCount >= textureCount) {
-            // 완료된로드
-            this._state = LoadStep.CompleteSetup;
-          }
-        };
-
-        // 짐
-        this._subdelegate
-          .getTextureManager()
-          .createTextureFromPngFile(texturePath, usePremultiply, onLoad);
-        this.getRenderer().setIsPremultipliedAlpha(usePremultiply);
+                if (this._textureCount >= textureCount) {
+                    this._state = LoadStep.CompleteSetup;
+                }
+             };
+             
+              this._subdelegate
+                .getTextureManager()
+                .createTextureFromPngFile(fullPath, usePremultiply, onLoad);
+              this.getRenderer().setIsPremultipliedAlpha(usePremultiply);
+        }
       }
 
       this._state = LoadStep.WaitLoadTexture;
@@ -527,15 +558,9 @@ export class LAppModel extends CubismUserModel {
     this._model.loadParameters(); // 前回セーブされた状態をロード
     if (this._motionManager.isFinished()) {
       // 움직임이 재생되지 않으면 대기 동작에서 무작위로 재생
-      this.startRandomMotion(
-        LAppDefine.MotionGroupIdle,
-        LAppDefine.PriorityIdle
-      );
+      this.startRandomMotion(LAppDefine.MotionGroupIdle, LAppDefine.PriorityIdle);
     } else {
-      motionUpdated = this._motionManager.updateMotion(
-        this._model,
-        deltaTimeSeconds
-      ); // モーションを更新
+      motionUpdated = this._motionManager.updateMotion(this._model, deltaTimeSeconds); // モーションを更新
     }
     this._model.saveParameters(); // 状態を保存
     // ------------------------------------------------------------------------------------
@@ -556,16 +581,10 @@ export class LAppModel extends CubismUserModel {
     // 드래그하여 얼굴 방향을 조정합니다
     this._model.addParameterValueById(this._idParamAngleX, this._dragX * 30); // -30から30の値を加える
     this._model.addParameterValueById(this._idParamAngleY, this._dragY * 30);
-    this._model.addParameterValueById(
-      this._idParamAngleZ,
-      this._dragX * this._dragY * -30
-    );
+    this._model.addParameterValueById(this._idParamAngleZ, this._dragX * this._dragY * -30);
 
     // 드래그하여 신체 방향을 조정합니다
-    this._model.addParameterValueById(
-      this._idParamBodyAngleX,
-      this._dragX * 10
-    ); // -10から10の値を加える
+    this._model.addParameterValueById(this._idParamBodyAngleX, this._dragX * 10); // -10から10の値を加える
 
     // 드래그하여 눈의 방향을 조정합니다
     this._model.addParameterValueById(this._idParamEyeBallX, this._dragX); // -1から1の値を加える
@@ -585,19 +604,24 @@ export class LAppModel extends CubismUserModel {
     if (this._lipsync) {
       let value = 0.0; // リアルタイムでリップシンクを行う場合、システムから音量を取得して、0~1の範囲で値を入力します。
 
-      this._wavFileHandler.update(deltaTimeSeconds);
-      value = this._wavFileHandler.getRms();
+      // 1. 외부에서 주입된 립싱크 값 확인
+      if (this._userLipSyncValue >= 0) {
+        value = this._userLipSyncValue;
+        // _userLipSyncValue는 한 프레임에만 유효하도록 초기화하거나 유지할지는 정책 나름.
+        // 여기서는 외부에서 매 프레임 넣어준다고 가정하고 유지, 또는 오디오가 끊기면 0이 들어온다고 가정.
+      } else {
+          // 2. 내부 핸들러 사용 (기존 로직 유지 또는 제거 가능)
+          this._wavFileHandler.update(deltaTimeSeconds);
+          value = this._wavFileHandler.getRms();
 
-      // WavFileHandler(로컬 파일) 재생 중이 아니면 WebSocket(스트리밍) 볼륨 확인
-      if (value <= 0.001) {
-        const wsManager = LAppDelegate.getInstance().getWebSocketManager();
-        if (wsManager) {
-          value = wsManager.getCurrentRms();
-        }
+          // WavFileHandler(로컬 파일) 재생 중이 아니면 0
+          if (value <= 0.001) {
+              value = 0;
+          }
+
+          value = Math.sqrt(value) * 0.6;
+          value = Math.min(value, 1.0);
       }
-
-      value = Math.sqrt(value) * 0.6;
-      value = Math.min(value, 1.0);
 
       for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
         this._model.addParameterValueById(this._lipSyncIds.at(i), value, 1.0);
@@ -611,6 +635,16 @@ export class LAppModel extends CubismUserModel {
 
     this._model.update();
   }
+
+  /**
+   * 외부에서 립싱크 값을 직접 설정
+   */
+  public setLipSyncValue(value: number): void {
+      this._userLipSyncValue = value;
+  }
+  
+  private _userLipSyncValue: number = -1; // -1이면 내부 로직 사용
+  private _resources: Map<string, ArrayBuffer> | null = null;
 
   /**
    * 인수에 의해 지정된 모션 재생 시작
@@ -644,17 +678,7 @@ export class LAppModel extends CubismUserModel {
     let autoDelete = false;
 
     if (motion == null) {
-      fetch(`${this._modelHomeDir}${motionFileName}`)
-        .then(response => {
-          if (response.ok) {
-            return response.arrayBuffer();
-          } else if (response.status >= 400) {
-            CubismLogError(
-              `Failed to load file ${this._modelHomeDir}${motionFileName}`
-            );
-            return new ArrayBuffer(0);
-          }
-        })
+      this.getFile(motionFileName)
         .then(arrayBuffer => {
           motion = this.loadMotion(
             arrayBuffer,
@@ -667,6 +691,9 @@ export class LAppModel extends CubismUserModel {
             no,
             this._motionConsistency
           );
+        })
+        .catch(() => {
+            CubismLogError(`Failed to load file ${motionFileName}`);
         });
 
       if (motion) {
@@ -674,7 +701,7 @@ export class LAppModel extends CubismUserModel {
         autoDelete = true; // 終了時にメモリから削除
       } else {
         CubismLogError("Can't start motion {0} .", motionFileName);
-        //로드 할 수없는 동작에 대한 ReservePriority를 ​​재설정
+        // 로드 할 수없는 동작에 대한 ReservePriority를 재설정
         this._motionManager.setReservePriority(LAppDefine.PriorityNone);
         return InvalidMotionQueueEntryHandleValue;
       }
@@ -694,11 +721,7 @@ export class LAppModel extends CubismUserModel {
     if (this._debugMode) {
       LAppPal.printMessage(`[APP]start motion: [${group}_${no}]`);
     }
-    return this._motionManager.startMotionPriority(
-      motion,
-      autoDelete,
-      priority
-    );
+    return this._motionManager.startMotionPriority(motion, autoDelete, priority);
   }
 
   /**
@@ -718,17 +741,9 @@ export class LAppModel extends CubismUserModel {
       return InvalidMotionQueueEntryHandleValue;
     }
 
-    const no: number = Math.floor(
-      Math.random() * this._modelSetting.getMotionCount(group)
-    );
+    const no: number = Math.floor(Math.random() * this._modelSetting.getMotionCount(group));
 
-    return this.startMotion(
-      group,
-      no,
-      priority,
-      onFinishedMotionHandler,
-      onBeganMotionHandler
-    );
+    return this.startMotion(group, no, priority, onFinishedMotionHandler, onBeganMotionHandler);
   }
 
   /**
@@ -817,22 +832,10 @@ export class LAppModel extends CubismUserModel {
       // ex) idle_0
       const name = `${group}_${i}`;
       if (this._debugMode) {
-        LAppPal.printMessage(
-          `[APP]load motion: ${motionFileName} => [${name}]`
-        );
+        LAppPal.printMessage(`[APP]load motion: ${motionFileName} => [${name}]`);
       }
 
-      fetch(`${this._modelHomeDir}${motionFileName}`)
-        .then(response => {
-          if (response.ok) {
-            return response.arrayBuffer();
-          } else if (response.status >= 400) {
-            CubismLogError(
-              `Failed to load file ${this._modelHomeDir}${motionFileName}`
-            );
-            return new ArrayBuffer(0);
-          }
-        })
+      this.getFile(motionFileName)
         .then(arrayBuffer => {
           const tmpMotion: CubismMotion = this.loadMotion(
             arrayBuffer,
@@ -872,9 +875,7 @@ export class LAppModel extends CubismUserModel {
 
             this.createRenderer();
             this.setupTextures();
-            this.getRenderer().startUp(
-              this._subdelegate.getGlManager().getGl()
-            );
+            this.getRenderer().startUp(this._subdelegate.getGlManager().getGl());
           }
         });
     }
@@ -904,10 +905,7 @@ export class LAppModel extends CubismUserModel {
     const canvas = this._subdelegate.getCanvas();
     const viewport: number[] = [0, 0, canvas.width, canvas.height];
 
-    this.getRenderer().setRenderState(
-      this._subdelegate.getFrameBuffer(),
-      viewport
-    );
+    this.getRenderer().setRenderState(this._subdelegate.getFrameBuffer(), viewport);
     this.getRenderer().drawModel();
   }
 
@@ -967,13 +965,12 @@ export class LAppModel extends CubismUserModel {
     if (this._debugMode) {
       LAppPal.printMessage(`[APP]start voice: ${voicePath}`);
     }
-    
+
     this._wavFileHandler.start(voicePath);
     this.playAudio(voicePath);
-    
   }
 
-    /**
+  /**
    * オーディオを実際に再生する
    * @param audioPath オーディオファイルのパス
    */
@@ -983,13 +980,13 @@ export class LAppModel extends CubismUserModel {
       this._audio.pause();
       this._audio = null;
     }
-    
+
     // 새 오디오 재생
     this._audio = new Audio(audioPath);
     this._audio.play().catch(error => {
       LAppPal.printMessage(`[APP]Audio play error: ${error}`);
     });
-    
+
     if (this._debugMode) {
       LAppPal.printMessage(`[APP]Playing audio: ${audioPath}`);
     }
@@ -1078,5 +1075,5 @@ export class LAppModel extends CubismUserModel {
   _allMotionCount: number; // モーション総数
   _wavFileHandler: LAppWavFileHandler; //wavファイルハンドラ
   _consistency: boolean; // MOC3整合性チェック管理用
-  private _audio: HTMLAudioElement | null = null; 
+  private _audio: HTMLAudioElement | null = null;
 }

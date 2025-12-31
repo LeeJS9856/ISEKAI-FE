@@ -18,7 +18,7 @@ export let s_instance: LAppDelegate = null;
  * 응용 프로그램 클래스.
  * Cubism SDK 관리.
  */
-export class LAppDelegate { 
+export class LAppDelegate {
   /**
    * 클래스의 인스턴스 (싱글 톤)를 반환합니다.
    * 인스턴스가 생성되지 않으면 내부적으로 인스턴스를 만듭니다.
@@ -126,6 +126,7 @@ export class LAppDelegate {
       // 루프에 대한 재귀 호출
       requestAnimationFrame(loop);
     };
+    console.log('[LAppDelegate] Run loop started');
     loop();
   }
 
@@ -136,10 +137,7 @@ export class LAppDelegate {
     this.releaseEventListener();
     this.releaseSubdelegates();
 
-    if (this._webSocketManager) {
-      this._webSocketManager.dispose();
-      this._webSocketManager = null;
-    }
+
 
     // 입체파 SDK를 릴리스합니다
     CubismFramework.dispose();
@@ -191,20 +189,88 @@ export class LAppDelegate {
    * 앱에 필요한 것을 초기화하십시오.
    */
   public initialize(): boolean {
+    if (this._isInitialized) return true;
+
     // 입체파 초기화 SDK
     this.initializeCubism();
+    this.initializeEventListener(); // 이벤트 리스너 등록
 
-    this.initializeSubdelegates();
-    this.initializeEventListener();
-
-    this.initializeEmotionInput(); // 감정 입력창 초기화 로직 호출
-    this.initializeWebSocket(); // 웹소켓 초기화 로직 호출
+    this._isInitialized = true;
     return true;
   }
+
+  /**
+   * Register a new view (canvas) to the delegate.
+   * @param container The container element to append the canvas to.
+   * @returns The index/ID of the registered view.
+   */
+  public registerView(container: HTMLElement): number {
+      const index = this._subdelegates.getSize();
+      
+      // 1. 캔버스를 만들어서 container에 추가
+      const canvas = document.createElement('canvas');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      canvas.style.position = 'absolute';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      this._canvases.pushBack(canvas);
+      container.appendChild(canvas);
+
+      // 2. subdelegate를 만들고 초기화
+      const subdelegate = new LAppSubdelegate();
+      subdelegate.initialize(canvas);
+      this._subdelegates.pushBack(subdelegate);
+
+      // 3. WebGL 컨텍스트 유실 여부 확인
+      if (subdelegate.isContextLost()) {
+        CubismLogError(`The context for Canvas at index ${index} was lost.`);
+      }
+
+      return index;
+  }
+
+  /**
+   * Remove a view by index.
+   * Note: This simple implementation might have index shifting issues if not careful.
+   * For now, we assume views are not frequently removed or we just release resources but keep the slot.
+   * But proper way involves tracking IDs. Let's keep it simple for now: release the resources.
+   */
+  public removeView(index: number): void {
+      if (index >= 0 && index < this._subdelegates.getSize()) {
+          const subdelegate = this._subdelegates.at(index);
+          const canvas = this._canvases.at(index);
+          
+          if (subdelegate) {
+              subdelegate.release();
+          }
+          if (canvas && canvas.parentElement) {
+              canvas.parentElement.removeChild(canvas);
+          }
+          
+          // Removing from vector shifts indices, which breaks other view references if they rely on index.
+          // Ideally, we should use a Map<ID, View> or handle nulls.
+          // For this demo, let's just mark as released or handle vectors carefully.
+          // Limitations: Vector doesn't support easy removal by index without shift.
+          // We will leave it in vector but maybe clear it? 
+          // Re-implementing with proper ID management is out of scope for quick fix, 
+          // so we'll just accept that indices are unstable if removed, 
+          // BUT given React lifecycle, we usually mount/unmount.
+          
+          // WARNING: Current simple implementation does NOT remove from vector to preserve indices of others.
+          // It just cleans up the DOM and WebGL.
+      }
+  }
+
+  // Flag to check if global init is done
+  private _isInitialized: boolean = false;
   /**
    * 감정 입력창의 이벤트를 설정합니다.
    */
   private initializeEmotionInput(): void {
+    /*
     const inputElement = document.getElementById('emotion-input') as HTMLInputElement;
 
     if (inputElement) {
@@ -212,10 +278,6 @@ export class LAppDelegate {
         // Enter 키를 눌렀고, 입력값이 비어있지 않을 때
         if (e.key === 'Enter' && inputElement.value.trim() !== '') {
           const emotionKeyword = inputElement.value.trim();
-          // ▼▼▼ [추가된 코드] 사용자의 입력 텍스트를 채팅창 우측에 표시 ▼▼▼
-          // 0번 뷰(메인 화면)의 ChatManager를 가져와서 내 메시지를 추가합니다.
-          this.getView(0)?.getChatManager().addUserMessage(emotionKeyword);
-          // ▲▲▲ 여기까지 ▲▲▲
 
           // Live2D 매니저를 가져옵니다.
           const live2DManager = this._subdelegates.at(0)?.getLive2DManager();
@@ -234,6 +296,7 @@ export class LAppDelegate {
         }
       });
     }
+    */
   }
   /**
    * 이벤트 리스너를 설정하십시오.
@@ -285,36 +348,7 @@ export class LAppDelegate {
   /**
    * 캔버스를 생성하고 하위 방향을 초기화하십시오
    */
-  private initializeSubdelegates(): void {
-    const container = document.getElementById('live2d-container');
-
-    if (!container) {
-      console.error('live2d-container not found!');
-      return;
-    }
-
-    this._canvases.prepareCapacity(LAppDefine.CanvasNum);
-    this._subdelegates.prepareCapacity(LAppDefine.CanvasNum);
-
-    for (let i = 0; i < LAppDefine.CanvasNum; i++) {
-      // 1. 캔버스를 만들어서 container에 추가
-      const canvas = document.createElement('canvas');
-      this._canvases.pushBack(canvas);
-      container.appendChild(canvas);
-
-      // 2. subdelegate를 만들고 초기화
-      const subdelegate = new LAppSubdelegate();
-      subdelegate.initialize(this._canvases.at(i));
-      this._subdelegates.pushBack(subdelegate);
-
-      // 3. WebGL 컨텍스트 유실 여부 확인
-      if (subdelegate.isContextLost()) {
-        CubismLogError(
-          `The context for Canvas at index ${i} was lost.`
-        );
-      }
-    }
-  }
+  // Removed initializeSubdelegates as it is replaced by registerView
 
   /**
    * 개인 생성자
@@ -327,23 +361,6 @@ export class LAppDelegate {
 
   private keyDownEventListener: (this: Document, ev: KeyboardEvent) => void;
   private onKeyDown(e: KeyboardEvent): void {
-    // 1. 'd' 키 (App 레벨의 UI 토글)를 먼저 처리합니다.
-    if (e.key.toLowerCase() === 'd') {
-      
-      for (
-        let ite = this._subdelegates.begin();
-        ite.notEqual(this._subdelegates.end());
-        ite.preIncrement()
-      ) {
-        // LAppView를 직접 가져와서 토글 명령을 내립니다.
-        const view = ite.ptr().getView();
-        if (view) {
-          view.toggleSubtitle();
-        }
-      }
-      return; // 'd' 키 처리는 여기서 종료 (Manager로 전달 안 함)
-    }
-
     // 2. 'd'가 아닌 다른 모든 키 (모델 관련)는 Manager로 전달합니다.
     for (
       let ite = this._subdelegates.begin();
@@ -389,37 +406,27 @@ export class LAppDelegate {
    */
   private pointCancelEventListener: (this: Document, ev: PointerEvent) => void;
 
-  private _webSocketManager: WebSocketManager | null = null;
-
-  /**
-   * 웹소켓 자동 초기화
-   */
-  private async initializeWebSocket(): Promise<void> {
-    const WS_SERVER_URL = import.meta.env.VITE_WS_SERVER_URL;
-
-    try {
-      console.log('[App] WebSocket 연결 시작...');
-      this._webSocketManager = new WebSocketManager(WS_SERVER_URL);
-      await this._webSocketManager.initialize();
-      console.log('[App] 실시간 음성 스트리밍 활성화됨');
-    } catch (error) {
-      console.error('[App] WebSocket 초기화 실패:', error);
-      // 마이크 권한 거부 등의 에러 처리
-      if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        alert('마이크 접근 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해주세요.');
-      }
-    }
-  }
-  /**
-   * 웹소켓 매니저 인스턴스를 반환합니다.
-   */
-  public getWebSocketManager(): WebSocketManager | null {
-    return this._webSocketManager;
-  }
   public getLive2DManager(index: number = 0) {
     return this._subdelegates.at(index)?.getLive2DManager();
   }
   public getView(index: number = 0): any {
     return this._subdelegates.at(index)?.getView();
+  }
+
+  /**
+   * 외부에서 립싱크 값을 설정합니다. (0.0 ~ 1.0)
+   * React 등 외부 컴포넌트에서 오디오 볼륨을 분석하여 이 메서드를 호출합니다.
+   */
+  public setLipSyncValue(value: number, index: number = 0): void {
+    const live2DManager = this.getLive2DManager(index);
+    if (!live2DManager) return;
+
+    const models = live2DManager._models;
+    if (models.getSize() > 0) {
+        const model = models.at(0);
+        if (model) {
+            model.setLipSyncValue(value);
+        }
+    }
   }
 }

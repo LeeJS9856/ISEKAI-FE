@@ -11,11 +11,8 @@ import { CubismViewMatrix } from '@framework/math/cubismviewmatrix';
 import * as LAppDefine from './lappdefine';
 import { LAppDelegate } from './lappdelegate';
 import { LAppPal } from './lapppal';
-import { LAppSprite } from './lappsprite';
-import { TextureInfo } from './lapptexturemanager';
 import { TouchManager } from './touchmanager';
 import { LAppSubdelegate } from './lappsubdelegate';
-import { ChatManager } from './components/chatmanager'; // SubtitleBar에서 ChatManager로 변경
 
 /**
  * 그림 수업.
@@ -26,8 +23,6 @@ export class LAppView {
    */
   public constructor() {
     this._programId = null;
-    this._back = null;
-    this._gear = null;
 
     // 관련 이벤트 관리를 터치합니다
     this._touchManager = new TouchManager();
@@ -37,9 +32,6 @@ export class LAppView {
 
     // 화면 표시 및 이동을 변환하는 행렬
     this._viewMatrix = new CubismViewMatrix();
-
-    // ChatManager 인스턴스 생성
-    this._chatManager = new ChatManager();
   }
 
   /**
@@ -89,14 +81,10 @@ export class LAppView {
     this._touchManager = null;
     this._deviceToScreen = null;
 
-    this._gear.release();
-    this._gear = null;
-
-    this._back.release();
-    this._back = null;
-
-    this._subdelegate.getGlManager().getGl().deleteProgram(this._programId);
-    this._programId = null;
+    if (this._programId != null) {
+      this._subdelegate.getGlManager().getGl().deleteProgram(this._programId);
+      this._programId = null;
+    }
   }
 
   /**
@@ -104,13 +92,6 @@ export class LAppView {
    */
   public render(): void {
     this._subdelegate.getGlManager().getGl().useProgram(this._programId);
-
-    if (this._back) {
-      this._back.render(this._programId);
-    }
-    if (this._gear) {
-      this._gear.render(this._programId);
-    }
 
     this._subdelegate.getGlManager().getGl().flush();
 
@@ -125,71 +106,11 @@ export class LAppView {
   /**
    * 이미지를 초기화하십시오.
    */
+  /**
+   * 이미지를 초기화하십시오.
+   */
   public initializeSprite(): void {
-    const width: number = this._subdelegate.getCanvas().width;
-    const height: number = this._subdelegate.getCanvas().height;
-    const textureManager = this._subdelegate.getTextureManager();
-    const resourcesPath = LAppDefine.ResourcesPath;
-
-    let imageName = '';
-
-    // 배경 이미지 초기화
-    imageName = LAppDefine.BackImageName;
-
-    // 콜백 함수는 비동기식이므로 만듭니다
-    const initBackGroundTexture = (textureInfo: TextureInfo): void => {
-      const x: number = width * 0.5;
-      const y: number = height * 0.5;
-
-      // --- 여기서부터 수정
-      
-      // 1. 캔버스(화면)와 이미지의 비율을 계산합니다.
-      const canvasRatio = width / height;
-      const imageRatio = textureInfo.width / textureInfo.height;
-
-      let fwidth: number;
-      let fheight: number;
-
-      // 2. 비율을 비교해서 너비와 높이를 정합니다.
-      if (imageRatio > canvasRatio) {
-        // 이미지가 캔버스보다 가로로 더 길 경우
-        fheight = height; // 높이를 캔버스에 맞춤
-        fwidth = fheight * imageRatio; // 너비는 이미지 비율에 따라 조정
-      } else {
-        // 이미지가 캔버스보다 세로로 더 길거나 같을 경우
-        fwidth = width; // 너비를 캔버스에 맞춤
-        fheight = fwidth / imageRatio; // 높이는 이미지 비율에 따라 조정
-      }
-      
-      // --- 여기까지 수정 ---
-      this._back = new LAppSprite(x , y, fwidth, fheight, textureInfo.id);
-      this._back.setSubdelegate(this._subdelegate);
-    };
-
-    textureManager.createTextureFromPngFile(
-      resourcesPath + imageName,
-      false,
-      initBackGroundTexture
-    );
-
-    // 기어 이미지 초기화
-    imageName = LAppDefine.GearImageName;
-    const initGearTexture = (textureInfo: TextureInfo): void => {
-      const x = width - textureInfo.width * 0.5;
-      const y = height - textureInfo.height * 0.5;
-      const fwidth = textureInfo.width;
-      const fheight = textureInfo.height;
-      this._gear = new LAppSprite(x, y, fwidth, fheight, textureInfo.id);
-      this._gear.setSubdelegate(this._subdelegate);
-    };
-
-    textureManager.createTextureFromPngFile(
-      resourcesPath + imageName,
-      false,
-      initGearTexture
-    );
-
-    // 셰이더를 만듭니다
+     // 셰이더를 만듭니다
     if (this._programId == null) {
       this._programId = this._subdelegate.createShader();
     }
@@ -253,11 +174,11 @@ export class LAppView {
     lapplive2dmanager.onTap(x, y);
 
     // 기어를 탭 했습니까?
-    if (this._gear.isHit(posX, posY)) {
-      lapplive2dmanager.nextScene();
-    }
+    // if (this._gear.isHit(posX, posY)) {
+    //   lapplive2dmanager.nextScene();
+    // }
   }
-  
+
   /**
    * X 좌표를 변환하여 좌표를 봅니다.
    *
@@ -295,44 +216,13 @@ export class LAppView {
     return this._deviceToScreen.transformY(deviceY);
   }
 
-  /**
-   * 채팅 메시지를 표시하는 메소드 (말풍선 추가)
-   * @param name 캐릭터 이름
-   * @param message 메시지 내용
-   */
-  public showSubtitleMessage(name: string, message: string): void {
-      this._chatManager.showMessage(name, message);
-  }
 
-  /**
-   * 채팅 UI를 숨기는 메소드
-   */
-  public hideSubtitleMessage(): void {
-      this._chatManager.hide();
-  }
 
-  /**
-   * 채팅 UI의 보이기/숨기기 상태를 토글합니다.
-   */
-  public toggleSubtitle(): void {
-      this._chatManager.toggle();
-  }
-
-  /**
-   * LAppDelegate 등에서 ChatManager에 직접 접근하기 위한 Getter
-   */
-  public getChatManager(): ChatManager {
-    return this._chatManager;
-  }
-  
   _touchManager: TouchManager; // タッチマネージャー
   _deviceToScreen: CubismMatrix44; // デバイスからスクリーンへの行列
   _viewMatrix: CubismViewMatrix; // viewMatrix
   _programId: WebGLProgram; // シェーダID
-  _back: LAppSprite; // 배경 이미지
-  _gear: LAppSprite; // 기어 이미지
   _changeModel: boolean; // 모델 전환 플래그
   _isClick: boolean; // 클릭 중
   private _subdelegate: LAppSubdelegate;
-  private _chatManager: ChatManager; // 변수명 변경
 }
