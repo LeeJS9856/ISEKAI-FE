@@ -1,6 +1,6 @@
 import styled from '@emotion/styled';
-import { useState } from 'react';
-import { VoiceType } from './types';
+import { useForm, FormProvider } from 'react-hook-form';
+import { CreateChatFormData } from './types/form';
 import {
   NameInput,
   AppearanceInput,
@@ -8,74 +8,81 @@ import {
   VoiceSelector,
   BackgroundInput
 } from './components';
+import { useSaveCharacter } from './hooks';
 
 const CreateChatPage = () => {
-  // Form states
-  const [name, setName] = useState('');
-  const [appearance, setAppearance] = useState('');
-  const [personality, setPersonality] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState<VoiceType>('cute');
-  const [background, setBackground] = useState('');
+  const methods = useForm<CreateChatFormData>({
+    defaultValues: {
+      name: '',
+      appearance: '',
+      personality: '',
+      voice: 'cute',
+      background: '',
+      live2dFileName: '',
+      backgroundFileName: ''
+    }
+  });
 
-  // Playing voice state
-  const [playingVoice, setPlayingVoice] = useState<VoiceType | null>(null);
+  const { handleSubmit, watch } = methods;
 
-  const handleVoicePlay = (voiceType: VoiceType) => {
-    if (playingVoice === voiceType) {
-      setPlayingVoice(null);
-    } else {
-      setPlayingVoice(voiceType);
-      setSelectedVoice(voiceType);
+  // Save character mutation
+  const saveCharacterMutation = useSaveCharacter();
+
+  const onSubmit = async (data: CreateChatFormData) => {
+    try {
+      const result = await saveCharacterMutation.mutateAsync({
+        name: data.name,
+        live2dFileName: data.live2dFileName,
+        personality: data.personality,
+        voice: data.voice,
+        backgroundFileName: data.backgroundFileName
+      });
+      console.log('캐릭터 저장 성공:', result);
+      alert('캐릭터가 성공적으로 저장되었습니다!');
+    } catch (error) {
+      console.error('캐릭터 저장 실패:', error);
+      alert('캐릭터 저장에 실패했습니다.');
     }
   };
 
-  const handleSave = async () => {
-    const characterData = {
-      name,
-      appearance,
-      personality,
-      voice: selectedVoice,
-      background
-    };
-    console.log('Saving character:', characterData);
-  };
-
-  const isFormValid = name.trim() && appearance.trim() && personality.trim();
+  const formValues = watch();
+  const isFormValid =
+    formValues.name?.trim() && formValues.appearance?.trim() && formValues.personality?.trim();
 
   return (
-    <Container>
-      <MainContent>
-        <Section>
-          <SectionTitle>캐릭터 설정</SectionTitle>
-          <Card>
-            <NameInput value={name} onChange={setName} />
+    <FormProvider {...methods}>
+      <Container>
+        <MainContent>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <Section>
+              <SectionTitle>캐릭터 설정</SectionTitle>
+              <Card>
+                <NameInput />
 
-            <AppearanceInput value={appearance} onChange={setAppearance} />
+                <AppearanceInput />
 
-            <PersonalityInput value={personality} onChange={setPersonality} />
+                <PersonalityInput />
 
-            <VoiceSelector
-              selectedVoice={selectedVoice}
-              playingVoice={playingVoice}
-              onVoiceSelect={handleVoicePlay}
-            />
-          </Card>
-        </Section>
+                <VoiceSelector />
+              </Card>
+            </Section>
 
-        <Section>
-          <SectionTitle>배경 설정</SectionTitle>
-          <Card>
-            <BackgroundInput value={background} onChange={setBackground} />
-          </Card>
-        </Section>
+            <Section>
+              <SectionTitle>배경 설정</SectionTitle>
+              <Card>
+                <BackgroundInput />
+              </Card>
+            </Section>
 
-        <SaveSection>
-          <SaveBtn onClick={handleSave} disabled={!isFormValid}>
-            저장하기
-          </SaveBtn>
-        </SaveSection>
-      </MainContent>
-    </Container>
+            <SaveSection>
+              <SaveBtn type="submit" disabled={!isFormValid || saveCharacterMutation.isPending}>
+                {saveCharacterMutation.isPending ? '저장 중...' : '저장하기'}
+              </SaveBtn>
+            </SaveSection>
+          </form>
+        </MainContent>
+      </Container>
+    </FormProvider>
   );
 };
 
