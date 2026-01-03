@@ -3,3 +3,6 @@ export type { GenerateCharacterRequest, GenerateCharacterResponse } from './char
 
 export { generateBackground } from './background';
 export type { GenerateBackgroundRequest, GenerateBackgroundResponse } from './background';
+
+export { saveCharacter } from './save';
+export type { SaveCharacterRequest, SaveCharacterResponse } from './save';
