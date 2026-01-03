@@ -3,7 +3,10 @@ import {
   generateCharacter,
   GenerateCharacterResponse,
   generateBackground,
-  GenerateBackgroundResponse
+  GenerateBackgroundResponse,
+  saveCharacter,
+  SaveCharacterRequest,
+  SaveCharacterResponse
 } from '../api';
 
 /**
@@ -21,5 +24,12 @@ export const useGenerateCharacter = () => {
 export const useGenerateBackground = () => {
   return useMutation<GenerateBackgroundResponse, Error, string>({
     mutationFn: generateBackground
+  });
+};
+
+// 캐릭터 저장 뮤테이션 훅
+export const useSaveCharacter = () => {
+  return useMutation<SaveCharacterResponse, Error, SaveCharacterRequest>({
+    mutationFn: saveCharacter,
   });
 };
