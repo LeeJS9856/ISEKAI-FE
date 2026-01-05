@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Live2DViewer from '@/components/Live2DViewer';
 import { LAppDelegate } from '@/live2d-library/lappdelegate';
-import { COLORS, FONTS } from '@/constants'; // 폰트 설정을 위해 추가
+import { COLORS, FONTS } from '@/constants';
 
 const ChattingPage = () => {
   const wsUrl = import.meta.env.VITE_WS_SERVER_URL;
   const navigate = useNavigate();
-  const [isStarted, setIsStarted] = useState(false);
+  
+  // 오버레이가 삭제되었으므로 진입 시 바로 시작 상태로 설정하거나 
+  // 필요에 따라 권한 획득 시 true로 변경되게 유지합니다.
+  const [isStarted, setIsStarted] = useState(true); 
 
   const modelConfig = {
     emotionMap: {
@@ -16,10 +19,32 @@ const ChattingPage = () => {
       'sad': 'exp_02',
       'happy': 'exp_03'
     },
+    layout: {
+      x: 0.0, 
+      y: 0.0,
+      scaleX: 1.0,
+      scaleY: 1.0
+    }
   };
 
+  // 마이크 권한 체크 (백그라운드에서 권한 확인 용도만 남김)
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          // 이미 허용되어 있다면 바로 마이크 세션이 연결되도록 유도
+          if (status.state === 'granted') setIsStarted(true);
+        }
+      } catch (e) { console.warn(e); }
+    };
+    checkPermission();
+  }, []);
+
+  // --- 테스트용 채팅 로직 ---
   useEffect(() => {
     const inputElement = document.getElementById('emotion-input') as HTMLInputElement;
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && inputElement.value.trim() !== '') {
         const keyword = inputElement.value.trim();
@@ -27,8 +52,31 @@ const ChattingPage = () => {
         const manager = delegate.getLive2DManager();
         const view = delegate.getView();
 
+        if (view && view.getChatManager()) {
+          view.getChatManager().addUserMessage(keyword);
+          setTimeout(() => {
+            view.getChatManager().showMessage('AI', `"${keyword}"에 대한 AI 테스트 응답입니다!`);
+          }, 1000);
+        } else {
+          const list = document.getElementById('message-list');
+          if (list) {
+            const userB = document.createElement('div');
+            userB.className = 'bubble user';
+            userB.innerText = keyword;
+            list.appendChild(userB);
+            
+            setTimeout(() => {
+              const aiB = document.createElement('div');
+              aiB.className = 'bubble ai';
+              aiB.innerText = '시스템: 아직 모델이 로드되지 않았습니다.';
+              list.appendChild(aiB);
+              list.scrollTop = list.scrollHeight;
+            }, 800);
+            list.scrollTop = list.scrollHeight;
+          }
+        }
+
         if (manager) manager.startMotionWithEmotion(keyword);
-        if (view && view.getChatManager()) view.getChatManager().addUserMessage(keyword);
         inputElement.value = '';
       }
     };
@@ -39,7 +87,7 @@ const ChattingPage = () => {
 
   return (
     <PageContainer id="page-chat">
-      {/* 1. 배경 이미지 (원본 CSS 스타일 복원) */}
+      {/* 1. 배경 이미지 */}
       <Background className="chat-bg" />
 
       {/* 2. 뒤로가기 버튼 */}
@@ -47,16 +95,7 @@ const ChattingPage = () => {
         <img src="/Resources/arrow-back.png" alt="뒤로가기" />
       </BackButton>
 
-      {/* 3. 시작 오버레이 */}
-      {!isStarted && (
-        <StartOverlay>
-          <StartButton onClick={() => setIsStarted(true)}>
-            대화 시작하기 (마이크 활성화)
-          </StartButton>
-        </StartOverlay>
-      )}
-
-      {/* 4. Live2D 컨테이너 */}
+      {/* 3. Live2D 컨테이너 (좌측 50%) */}
       <Live2DContainer id="live2d-container">
         <Live2DWrapper>
           <Live2DViewer
@@ -67,7 +106,7 @@ const ChattingPage = () => {
         </Live2DWrapper>
       </Live2DContainer>
 
-      {/* 5. 채팅 UI (우측 50% 레이아웃 복원) */}
+      {/* 4. 채팅 UI (우측 50%) */}
       <ChatUIWrapper className="chat-ui-wrapper">
         <MessageList id="message-list" />
         <InputWrapper className="input-wrapper">
@@ -91,8 +130,8 @@ const PageContainer = styled.section`
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  /* 원본 CSS의 폰트 설정 반영 */
   font-family: ${FONTS.family.netmarble.medium}, sans-serif;
+  background-color: #000;
 `;
 
 const Background = styled.div`
@@ -101,13 +140,11 @@ const Background = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  /* 수정: 원본 CSS 파일명으로 복구 */
   background-image: url('/Resources/anime-school-background.jpg'); 
   background-size: cover;
   background-position: center;
-  /* 원본 CSS의 필터 효과 추가 */
   filter: blur(3px) brightness(1.0);
-  transform: scale(1.1); /* 블러 처리 시 외곽선 흰 여백 방지 */
+  transform: scale(1.1);
   z-index: 1;
 `;
 
@@ -119,71 +156,35 @@ const BackButton = styled.button`
   background: rgba(0, 0, 0, 0.3);
   border: none;
   border-radius: 50%;
-  cursor: pointer;
   padding: 10px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-
-  img {
-    width: 24px;
-    height: 24px;
-  }
-`;
-
-const StartOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-`;
-
-const StartButton = styled.button`
-  padding: 16px 32px;
-  background-color: #ff4d4d;
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 18px;
-  font-weight: 600;
+  img { width: 24px; height: 24px; }
 `;
 
 const Live2DContainer = styled.div`
   position: absolute;
-  top: 0;
-  left: 0;
-  /* 기존 100%에서 50%로 수정하여 좌측 절반만 차지하게 합니다 */
+  top: 0; 
+  left: 0; 
   width: 50%; 
   height: 100%;
-  z-index: 2;
-  display: flex;
-  align-items: center;
+  z-index: 2; 
+  display: flex; 
+  align-items: center; 
   justify-content: center;
 `;
 
-const Live2DWrapper = styled.div`
-  width: 100%;
-  height: 100%;
-`;
+const Live2DWrapper = styled.div` width: 100%; height: 100%; `;
 
 const ChatUIWrapper = styled.div`
   position: absolute;
-  top: 0;
-  right: 0;
-  /* 우측 절반만 차지하게 설정되어 있습니다 */
+  top: 0; 
+  right: 0; 
   width: 50%; 
   height: 100%;
-  z-index: 3;
-  display: flex;
+  z-index: 3; 
+  display: flex; 
   flex-direction: column;
-  padding: 40px;
+  padding: 40px 80px; 
   box-sizing: border-box;
 `;
 
@@ -195,11 +196,8 @@ const MessageList = styled.div`
   overflow-y: auto;
   padding-bottom: 20px;
   
-  /* 스크롤바 숨김 (원본 CSS 설정) */
   scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  &::-webkit-scrollbar { display: none; }
 
   .bubble {
     max-width: 80%;
@@ -208,7 +206,13 @@ const MessageList = styled.div`
     font-size: 1.1rem;
     line-height: 1.5;
     word-break: break-word;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   .bubble.ai {
@@ -220,26 +224,22 @@ const MessageList = styled.div`
 
   .bubble.user {
     align-self: flex-end;
-    /* 원본 CSS의 색상(#7fc8ba)으로 복구 */
     background-color: #7fc8ba; 
     color: #fff;
     border-bottom-right-radius: 4px;
   }
 `;
 
-const InputWrapper = styled.div`
-  width: 100%;
-  margin-top: 20px;
-`;
+const InputWrapper = styled.div` width: 100%; margin-top: 20px; `;
 
 const EmotionInput = styled.input`
   width: 100%;
   padding: 16px 24px;
   border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   font-size: 16px;
   outline: none;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(10px);
 `;
