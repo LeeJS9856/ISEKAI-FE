@@ -16,12 +16,6 @@ const ChattingPage = () => {
       'sad': 'exp_02',
       'happy': 'exp_03'
     },
-    layout: {
-      x: -0.5,
-      y: 0.0,
-      scaleX: 1.0,
-      scaleY: 1.0
-    }
   };
 
   useEffect(() => {
@@ -112,7 +106,7 @@ const Background = styled.div`
   background-size: cover;
   background-position: center;
   /* 원본 CSS의 필터 효과 추가 */
-  filter: blur(12px) brightness(0.7);
+  filter: blur(3px) brightness(1.0);
   transform: scale(1.1); /* 블러 처리 시 외곽선 흰 여백 방지 */
   z-index: 1;
 `;
@@ -165,9 +159,13 @@ const Live2DContainer = styled.div`
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  /* 기존 100%에서 50%로 수정하여 좌측 절반만 차지하게 합니다 */
+  width: 50%; 
   height: 100%;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const Live2DWrapper = styled.div`
@@ -179,7 +177,7 @@ const ChatUIWrapper = styled.div`
   position: absolute;
   top: 0;
   right: 0;
-  /* 원본 CSS 설정 반영: 우측 50% */
+  /* 우측 절반만 차지하게 설정되어 있습니다 */
   width: 50%; 
   height: 100%;
   z-index: 3;
