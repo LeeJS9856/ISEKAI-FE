@@ -6,14 +6,14 @@ import { useLive2D } from '../hooks/useLive2D';
 interface Live2DViewerProps {
   modelUrl: string;
   getLipSyncValue?: () => number;
-  emotion?: string;           // 감정 (예: "행복", "슬픔")
+  expression?: string;           // 감정 (예: "행복", "슬픔")
   motion?: string;            // 모션 이름 (예: "인사", "끄덕임")
 }
 
 const Live2DViewer = ({ 
   modelUrl, 
   getLipSyncValue, 
-  emotion="중립",
+  expression="중립",
   motion="대기"
 }: Live2DViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,10 +112,10 @@ const Live2DViewer = ({
 
   // 감정 변화 감지 및 적용
   useEffect(() => {
-    if (manager && emotion) {
-      manager.applyEmotion(emotion);
+    if (manager && expression) {
+      manager.applyEmotion(expression);
     }
-  }, [manager, emotion]);
+  }, [manager, expression]);
 
   // 모션 재생 (motion prop이 변경될 때)
   useEffect(() => {
