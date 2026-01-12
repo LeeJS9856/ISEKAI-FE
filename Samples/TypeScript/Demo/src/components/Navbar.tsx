@@ -51,7 +51,9 @@ export const Navbar: React.FC = () => {
       {loggedIn ? (
         <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
       ) : (
-        <LogoutButton onClick={handleLogin}>로그인</LogoutButton>
+        <KakaoLoginButton onClick={handleLogin}>
+          <img src="src/assets/images/kakao_login_medium.png" alt="카카오 로그인" />
+        </KakaoLoginButton>
       )}
     </Nav>
   );
@@ -109,27 +111,23 @@ const NavLink = styled(Link)<{ $active: boolean }>`
   }
 `;
 
-const LoginButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: ${LAYOUT.spacing.sm} ${LAYOUT.spacing.md};
-  border: 2px solid #FEE500;
-  border-radius: ${LAYOUT.borderRadius.lg};
-  background-color: transparent;
-  color: ${COLORS.text.primary};
-  font-size: ${FONTS.size.sm};
-  font-weight: ${FONTS.weight.medium};
-  transition: all 0.3s ease-out;
+// 카카오 로그인 버튼 (이미지 사용)
+const KakaoLoginButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
+  transition: all 0.3s ease-out;
+  
+  img {
+    border-radius: ${LAYOUT.borderRadius.md};
+    display: block;
+    height: 36px;
+    width: auto;
+  }
 
   &:hover {
-    background-color: #FEE500;
-    color: #000000;
-    
-    svg path {
-      fill: #000000;
-    }
+    opacity: 0.8;
   }
 
   &:active {
@@ -137,10 +135,11 @@ const LoginButton = styled.button`
   }
 `;
 
+// 로그아웃 버튼 (기존 스타일 유지)
 const LogoutButton = styled.button`
   padding: ${LAYOUT.spacing.sm} ${LAYOUT.spacing.md};
   border: 2px solid ${COLORS.accent.primary};
-  border-radius: ${LAYOUT.borderRadius.lg};
+  border-radius: ${LAYOUT.borderRadius.md};
   background-color: transparent;
   color: ${COLORS.text.primary};
   font-size: ${FONTS.size.sm};
