@@ -5,7 +5,8 @@ import { Navbar } from '@/components/Navbar';
 import { CharacterCard } from '@/components/CharacterCard';
 import { CharacterModal } from '@/components/CharacterModal';
 import { COLORS, LAYOUT, FONTS } from '@/constants';
-import { Character } from '@/types/character';
+import { Character, apiCharacterToCharacter } from '@/pages/Home/types/character';
+import { useCharacters } from '@/pages/Home/hooks/index';
 
 interface HomeProps {
   title?: string;
@@ -19,51 +20,15 @@ const Home: React.FC<HomeProps> = ({
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 임시 데이터 (추후 API로 대체)
-  const allCharacters: Character[] = [
-    {
-      id: '1',
-      title: '캐릭터 1',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=1'
-    },
-    {
-      id: '2',
-      title: '캐릭터 2',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=2'
-    },
-    {
-      id: '3',
-      title: '캐릭터 3',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=3'
-    },
-    {
-      id: '4',
-      title: '캐릭터 4',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=4'
-    },
-  ];
+  // API로부터 캐릭터 목록 가져오기
+  const { data, isLoading, error } = useCharacters({ page: 0, size: 10 });
 
-  // 내 캐릭터 페이지일 경우 일부만 표시
-  const myCharacters: Character[] = [
-    {
-      id: '1',
-      title: '캐릭터 1',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=1'
-    },
-    {
-      id: '2',
-      title: '캐릭터 2',
-      description: '캐릭터 설명입니다. 이것은 샘플 캐릭터의 상세 설명입니다.',
-      imageUrl: 'https://picsum.photos/240/180?random=2'
-    },
-  ];
-
-  const characters = isMyCharacters ? myCharacters : allCharacters;
+  // API 데이터를 Character 타입으로 변환
+  const characters: Character[] = data?.content
+    ? data.content
+        .filter(apiChar => !isMyCharacters || apiChar.isAuthorMe) // 내 캐릭터 필터링
+        .map(apiCharacterToCharacter)
+    : [];
 
   const handleCardClick = (character: Character) => {
     setSelectedCharacter(character);
@@ -79,21 +44,78 @@ const Home: React.FC<HomeProps> = ({
     // 추후 채팅 페이지로 이동 또는 채팅 시작 로직
   };
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <>
+        <Navbar />
+        <HomeContainer>
+          <SectionTitle>{title}</SectionTitle>
+          <LoadingMessage>캐릭터를 불러오는 중...</LoadingMessage>
+        </HomeContainer>
+      </>
+    );
+  }
+
+  // 에러 상태
+  if (error) {
+    console.error('캐릭터 목록 조회 에러:', error);
+    
+    // axios 에러인 경우 상세 정보 출력
+    if ('response' in error && error.response) {
+      console.error('응답 상태:', error.response.status);
+      console.error('응답 데이터:', error.response.data);
+    }
+    
+    return (
+      <>
+        <Navbar />
+        <HomeContainer>
+          <SectionTitle>{title}</SectionTitle>
+          <ErrorMessage>
+            <ErrorTitle>캐릭터를 불러오는데 실패했습니다</ErrorTitle>
+            <ErrorDetails>
+              {'response' in error && error.response ? (
+                <>
+                  <p>상태 코드: {error.response.status}</p>
+                  {error.response.status === 500 && (
+                    <p>서버에서 오류가 발생했습니다. 잠시 후 다시 시도해주세요.</p>
+                  )}
+                  {error.response.status === 401 && (
+                    <p>로그인이 필요합니다.</p>
+                  )}
+                </>
+              ) : (
+                <p>{error.message}</p>
+              )}
+            </ErrorDetails>
+          </ErrorMessage>
+        </HomeContainer>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
       <HomeContainer>
         <SectionTitle>{title}</SectionTitle>
         
-        <CharacterGrid>
-          {characters.map((character) => (
-            <CharacterCard 
-              key={character.id} 
-              character={character}
-              onClick={handleCardClick}
-            />
-          ))}
-        </CharacterGrid>
+        {characters.length === 0 ? (
+          <EmptyMessage>
+            {isMyCharacters ? '아직 생성한 캐릭터가 없습니다.' : '캐릭터가 없습니다.'}
+          </EmptyMessage>
+        ) : (
+          <CharacterGrid>
+            {characters.map((character) => (
+              <CharacterCard 
+                key={character.id} 
+                character={character}
+                onClick={handleCardClick}
+              />
+            ))}
+          </CharacterGrid>
+        )}
       </HomeContainer>
 
       <CharacterModal
@@ -126,6 +148,40 @@ const CharacterGrid = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(${LAYOUT.card.width}, 1fr));
   gap: ${LAYOUT.spacing.md};
   margin-top: ${LAYOUT.spacing.md};
+`;
+
+const LoadingMessage = styled.div`
+  text-align: center;
+  padding: ${LAYOUT.spacing['2xl']};
+  color: ${COLORS.text.secondary};
+  font-size: ${FONTS.size.md};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: ${LAYOUT.spacing['2xl']};
+`;
+
+const ErrorTitle = styled.h2`
+  color: ${COLORS.status.error};
+  font-size: ${FONTS.size.lg};
+  margin-bottom: ${LAYOUT.spacing.md};
+`;
+
+const ErrorDetails = styled.div`
+  color: ${COLORS.text.secondary};
+  font-size: ${FONTS.size.md};
+  
+  p {
+    margin: ${LAYOUT.spacing.xs} 0;
+  }
+`;
+
+const EmptyMessage = styled.div`
+  text-align: center;
+  padding: ${LAYOUT.spacing['2xl']};
+  color: ${COLORS.text.secondary};
+  font-size: ${FONTS.size.md};
 `;
 
 export default Home;
