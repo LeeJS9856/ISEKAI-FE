@@ -1,5 +1,5 @@
 import { axiosClient } from '@/api/client';
-import { CharactersResponse } from '@/pages/Home/types/character';
+import { CharactersResponse } from '@/types/character';
 
 export interface GetCharactersParams {
   page?: number;
@@ -12,8 +12,11 @@ export interface GetCharactersParams {
 export const getCharacters = async (
   params?: GetCharactersParams
 ): Promise<CharactersResponse> => {
-  const response = await axiosClient.get<CharactersResponse>('/characters?page=1&size=12', {
-    params
+  const response = await axiosClient.get<CharactersResponse>('/characters', {
+    params: {
+      page: params?.page ?? 0,
+      size: params?.size ?? 10
+    }
   });
   return response.data;
 };
