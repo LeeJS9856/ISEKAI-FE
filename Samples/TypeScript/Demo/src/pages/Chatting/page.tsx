@@ -15,6 +15,9 @@ const ChattingPage = () => {
   // React 상태로 채팅 메시지 관리
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStarted, setIsStarted] = useState(true);
+  
+  // 줌 레벨 상태 (1.0 = 기본, 1.5 = 150% 확대, 2.0 = 200% 확대)
+  const [zoomLevel, setZoomLevel] = useState(1.0);
 
   // 메시지 추가 헬퍼 함수
   const addMessage = useCallback((type: 'user' | 'ai', text: string) => {
@@ -52,6 +55,15 @@ const ChattingPage = () => {
     [addMessage]
   );
 
+  // 줌 인/아웃 핸들러
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + 0.5, 4.0));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev - 0.5, 1.0));
+  }, []);
+
   // 마이크 권한 체크
   useEffect(() => {
     const checkPermission = async () => {
@@ -79,14 +91,25 @@ const ChattingPage = () => {
         <img src="/Resources/arrow-back.png" alt="뒤로가기" />
       </BackButton>
 
-      {/* 3. Live2D 컨테이너 (좌측 50%) */}
+      {/* 3. 줌 컨트롤 버튼 */}
+      <ZoomControls>
+        <ZoomButton onClick={handleZoomIn}>+</ZoomButton>
+        <ZoomLevel>{Math.round(zoomLevel * 100)}%</ZoomLevel>
+        <ZoomButton onClick={handleZoomOut} disabled={zoomLevel <= 1.0}>−</ZoomButton>
+      </ZoomControls>
+
+      {/* 4. Live2D 컨테이너 (좌측 50%) */}
       <Live2DContainer>
         <Live2DWrapper>
-          <Live2DViewer modelUrl="/Resources/live2d_model.zip" getLipSyncValue={getCurrentRms} />
+          <Live2DViewer 
+            modelUrl="/Resources/live2d_model.zip" 
+            getLipSyncValue={getCurrentRms} 
+            zoom={zoomLevel}
+          />
         </Live2DWrapper>
       </Live2DContainer>
 
-      {/* 4. 채팅 UI (우측 50%) - React 컴포넌트 사용 */}
+      {/* 5. 채팅 UI (우측 50%) - React 컴포넌트 사용 */}
       <ChatUIWrapper>
         <ChatMessages messages={messages} />
         <ChatInput
@@ -169,4 +192,51 @@ const ChatUIWrapper = styled.div`
   flex-direction: column;
   padding: 40px 80px;
   box-sizing: border-box;
+`;
+
+const ZoomControls = styled.div`
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 20px;
+  padding: 12px 8px;
+  backdrop-filter: blur(8px);
+`;
+
+const ZoomButton = styled.button<{ disabled?: boolean }>`
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: ${props => props.disabled ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)'};
+  color: ${props => props.disabled ? 'rgba(255, 255, 255, 0.4)' : '#fff'};
+  font-size: 20px;
+  font-weight: bold;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+`;
+
+const ZoomLevel = styled.span`
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 `;
