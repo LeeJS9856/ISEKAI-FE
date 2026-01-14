@@ -5,6 +5,8 @@ import Live2DViewer from '@/components/Live2DViewer';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import ChatMessages from '@/components/ChatMessages';
 import ChatInput from '@/components/ChatInput';
+import OverlayButton from '@/components/OverlayButton';
+import OverlayContainer from '@/components/OverlayContainer';
 import { FONTS } from '@/constants';
 import { ChatMessage } from '@/types/chat';
 
@@ -87,16 +89,20 @@ const ChattingPage = () => {
       <Background />
 
       {/* 2. 뒤로가기 버튼 */}
-      <BackButton onClick={() => navigate(-1)}>
-        <img src="/Resources/arrow-back.png" alt="뒤로가기" />
-      </BackButton>
+      <BackButtonWrapper>
+        <OverlayButton onClick={() => navigate(-1)} size="md">
+          <img src="/Resources/arrow-back.png" alt="뒤로가기" />
+        </OverlayButton>
+      </BackButtonWrapper>
 
       {/* 3. 줌 컨트롤 버튼 */}
-      <ZoomControls>
-        <ZoomButton onClick={handleZoomIn}>+</ZoomButton>
-        <ZoomLevel>{Math.round(zoomLevel * 100)}%</ZoomLevel>
-        <ZoomButton onClick={handleZoomOut} disabled={zoomLevel <= 1.0}>−</ZoomButton>
-      </ZoomControls>
+      <ZoomControlsWrapper>
+        <OverlayContainer padding="md">
+          <OverlayButton onClick={handleZoomIn} size="sm">+</OverlayButton>
+          <ZoomLevel>{Math.round(zoomLevel * 100)}%</ZoomLevel>
+          <OverlayButton onClick={handleZoomOut} size="sm" disabled={zoomLevel <= 1.0}>−</OverlayButton>
+        </OverlayContainer>
+      </ZoomControlsWrapper>
 
       {/* 4. Live2D 컨테이너 (좌측 50%) */}
       <Live2DContainer>
@@ -148,20 +154,11 @@ const Background = styled.div`
   z-index: 1;
 `;
 
-const BackButton = styled.button`
+const BackButtonWrapper = styled.div`
   position: absolute;
   top: 20px;
   left: 20px;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.3);
-  border: none;
-  border-radius: 50%;
-  padding: 10px;
-  display: flex;
-  img {
-    width: 24px;
-    height: 24px;
-  }
 `;
 
 const Live2DContainer = styled.div`
@@ -194,44 +191,11 @@ const ChatUIWrapper = styled.div`
   box-sizing: border-box;
 `;
 
-const ZoomControls = styled.div`
+const ZoomControlsWrapper = styled.div`
   position: absolute;
   top: 80px;
   left: 20px;
   z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 20px;
-  padding: 12px 8px;
-  backdrop-filter: blur(8px);
-`;
-
-const ZoomButton = styled.button<{ disabled?: boolean }>`
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: ${props => props.disabled ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)'};
-  color: ${props => props.disabled ? 'rgba(255, 255, 255, 0.4)' : '#fff'};
-  font-size: 20px;
-  font-weight: bold;
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.5);
-    transform: scale(1.1);
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.95);
-  }
 `;
 
 const ZoomLevel = styled.span`
