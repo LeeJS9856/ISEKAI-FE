@@ -1,11 +1,21 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const AUTH_TOKEN = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwiaWQiOjIsImVtYWlsIjoibGV3aXMxN0BuYXZlci5jb20iLCJpYXQiOjE3Njc2NzY2MDQsImV4cCI6MTc2NzY5ODIwNH0.gWWvWoUNRRDw0TmdT3VMs1ju7DgWuiPirD83gm_E4Yf9IZXo7jRmjzSLTc7iX6HX6jpFRS5NkmbY8iJKz9tdJQ";
 
 export const axiosClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${AUTH_TOKEN}`
-  }
 });
+
+// 매 요청마다 localStorage에서 accessToken을 가져와 헤더에 추가
+axiosClient.interceptors.request.use(
+  (config) => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
