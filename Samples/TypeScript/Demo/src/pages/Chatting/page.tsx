@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import styled from '@emotion/styled';
 import Live2DViewer from '@/components/Live2DViewer';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -8,45 +9,50 @@ import ChatInput from '@/components/ChatInput';
 import OverlayButton from '@/components/OverlayButton';
 import OverlayContainer from '@/components/OverlayContainer';
 import { FONTS } from '@/constants';
-import { ChatMessage } from '@/types/chat';
+import { EmotionType } from '@/types/chat';
+import { getTicketForWebSocket } from './api/getTicketForWebSocket';
+import { useChatMessages } from './hooks/useChatMessages';
+
+// 웹소켓 감정 타입 → Live2D 감정 이름 매핑
+const EMOTION_MAP: Record<EmotionType, string> = {
+  SAD: '슬픔',
+  SHY: '부끄러움',
+  HAPPY: '행복',
+  ANGRY: '화남',
+  NEUTRAL: '중립',
+  SURPRISED: '놀람',
+  DESPISE: '경멸'
+};
 
 const ChattingPage = () => {
-  const wsUrl = import.meta.env.VITE_WS_SERVER_URL;
+  const wsBaseUrl = import.meta.env.VITE_WS_SERVER_URL;
   const navigate = useNavigate();
+  const { characterId } = useParams<{ characterId: string }>();
 
-  // React 상태로 채팅 메시지 관리
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 채팅 메시지 관리 (커스텀 훅으로 분리)
+  const { messages, isBotResponding, currentEmotion, handlers } = useChatMessages();
+
+  // UI 상태
   const [isStarted, setIsStarted] = useState(true);
-  
-  // 줌 레벨 상태 (1.0 = 기본, 1.5 = 150% 확대, 2.0 = 200% 확대)
   const [zoomLevel, setZoomLevel] = useState(1.0);
 
-  // 메시지 추가 헬퍼 함수
-  const addMessage = useCallback((type: 'user' | 'ai', text: string) => {
-    const newMessage: ChatMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      text,
-      timestamp: Date.now()
-    };
-    setMessages(prev => [...prev, newMessage]);
-  }, []);
+  // 1. WS 티켓 발급 (React Query 사용)
+  const { data: ticket } = useQuery({
+    queryKey: ['ws-ticket'],
+    queryFn: getTicketForWebSocket,
+    staleTime: 1000 * 60, // 1분간 캐시 유지 (선택사항)
+  });
 
-  // WebSocket 이벤트 핸들러
-  const handleUserSTT = useCallback((text: string) => {
-    addMessage('user', text);
-  }, []);
-
-  const handleSubtitle = useCallback((text: string) => {
-    addMessage('ai', text);
-  }, []);
+  // 2. URL 구성 (티켓과 characterId가 있을 때만 생성)
+  const fullWsUrl = (characterId && ticket && wsBaseUrl) 
+    ? `${wsBaseUrl}/characters/${characterId}/voice?ticket=${ticket}`
+    : '';
 
   // WebSocket 연결 및 오디오 스트리밍
-  const { getCurrentRms } = useWebSocket({
-    serverUrl: isStarted ? wsUrl : '',
+  const { getCurrentRms, isServerReady } = useWebSocket({
+    serverUrl: isStarted ? fullWsUrl : '',
     autoConnect: isStarted,
-    onUserSTT: handleUserSTT,
-    onSubtitle: handleSubtitle
+    ...handlers
   });
 
   // 사용자 입력 처리
@@ -54,7 +60,7 @@ const ChattingPage = () => {
     (text: string) => {
       //추후 구현
     },
-    [addMessage]
+    []
   );
 
   // 줌 인/아웃 핸들러
@@ -111,6 +117,7 @@ const ChattingPage = () => {
             modelUrl="/Resources/live2d_model.zip" 
             getLipSyncValue={getCurrentRms} 
             zoom={zoomLevel}
+            expression={EMOTION_MAP[currentEmotion]}
           />
         </Live2DWrapper>
       </Live2DContainer>
