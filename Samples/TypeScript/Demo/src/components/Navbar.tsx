@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { COLORS, LAYOUT, FONTS } from '@/constants';
 import { initiateKakaoLogin, kakaoLogout, isLoggedIn } from '@/utils/kakaoAuth';
+import kakaoLoginImage from '@/assets/images/kakao_login_medium.png';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
@@ -56,7 +57,7 @@ export const Navbar: React.FC = () => {
         <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
       ) : (
         <KakaoLoginButton onClick={handleLogin}>
-          <img src="src/assets/images/kakao_login_medium.png" alt="카카오 로그인" />
+          <img src={kakaoLoginImage}  alt="카카오 로그인" />
         </KakaoLoginButton>
       )}
     </Nav>
