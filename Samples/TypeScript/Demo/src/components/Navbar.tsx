@@ -13,8 +13,8 @@ export const Navbar: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const userEmail = userInfo.email;
-  const userName = userInfo.nickname;
+  const userEmail = userInfo.email || '';
+  const userName = userInfo.nickname || '사용자';
   
   const getCurrentPage = () => {
     const path = location.pathname;
