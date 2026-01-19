@@ -164,10 +164,16 @@ export const useChatMessages = () => {
     setIsBotResponding(false);
   }, [clearStreamingMessages]);
 
+  // 텍스트 메시지 전송 시 사용 (TEXT_MESSAGE는 USER_SUBTITLE이 안 오므로 직접 추가)
+  const addUserTextMessage = useCallback((text: string) => {
+    setMessages(prev => [...prev, createCompleteMessage('user', text)]);
+  }, []);
+
   return {
     messages,
     isBotResponding,
     currentEmotion,
+    addUserTextMessage,
     
     handlers: {
       onServerReady: handleServerReady,
