@@ -100,18 +100,17 @@ export const useChatMessages = () => {
         return prev;
       }
       
-      // 확정된 텍스트에 새 문장 추가
-      const newConfirmedText = confirmedUserTextRef.current + sentence;
-      confirmedUserTextRef.current = newConfirmedText;
+      // 서버가 전체 누적 문장을 보내므로, sentence를 그대로 사용
+      confirmedUserTextRef.current = sentence;
       
       if (last?.id === STREAMING_USER_ID) {
         return [
           ...prev.slice(0, -1),
-          createStreamingMessage(STREAMING_USER_ID, 'user', newConfirmedText)
+          createStreamingMessage(STREAMING_USER_ID, 'user', sentence)
         ];
       }
       
-      return [...prev, createStreamingMessage(STREAMING_USER_ID, 'user', newConfirmedText)];
+      return [...prev, createStreamingMessage(STREAMING_USER_ID, 'user', sentence)];
     });
   }, []);
 
@@ -125,6 +124,7 @@ export const useChatMessages = () => {
       createCompleteMessage('user', user),
       createCompleteMessage('ai', bot),
     ]);
+    clearStreamingMessages();
     setIsBotResponding(false);
   }, []);
 
