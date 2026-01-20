@@ -11,9 +11,9 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9
 /**
  * 채팅 메시지 상태 관리 훅
  * 
- * USER_SUBTITLE_CHUNK와 USER_ONE_SENTENCE_SUBTITLE 관계:
- * - 청크들이 실시간으로 오다가, 문장이 완성되면 USER_ONE_SENTENCE_SUBTITLE로 옴
- * - USER_ONE_SENTENCE_SUBTITLE는 "본인 청크들"만 대체 (이전 문장은 유지)
+ * USER_SUBTITLE_CHUNK와 USER_SUBTITLE_COMPLETE 관계:
+ * - 청크들이 실시간으로 오다가, 문장이 완성되면 USER_SUBTITLE_COMPLETE로 옴
+ * - USER_SUBTITLE_COMPLETE는 "본인 청크들"만 대체 (이전 문장은 유지)
  * 
  * 예시:
  * 청크 "안", "녕" → SENTENCE "안녕" → 청크 "하", "세", "요" → SENTENCE "하세요"
@@ -24,7 +24,7 @@ export const useChatMessages = () => {
   const [isBotResponding, setIsBotResponding] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('NEUTRAL');
   
-  // 확정된 사용자 텍스트 (USER_ONE_SENTENCE_SUBTITLE로 확정된 부분)
+  // 확정된 사용자 텍스트 (USER_SUBTITLE_COMPLETE로 확정된 부분)
   const confirmedUserTextRef = useRef('');
 
   // ========== 헬퍼 함수 ==========
@@ -85,56 +85,32 @@ export const useChatMessages = () => {
   }, []);
 
   /**
-   * USER_ONE_SENTENCE_SUBTITLE: 본인 청크들만 대체 (이전 문장 유지)
+   * USER_SUBTITLE_COMPLETE: 본인 청크들만 대체 (이전 문장 유지)
    * 확정된 텍스트 + 새 문장 = 전체 스트리밍 텍스트
+   * 
+   * 단, 마지막 메시지가 텍스트로 보낸 완료된 user 메시지인 경우 무시
+   * (텍스트 메시지는 addUserTextMessage로 바로 complete 상태로 추가됨)
    */
   const handleUserSentence = useCallback((sentence: string) => {
-    // 확정된 텍스트에 새 문장 추가
-    const newConfirmedText = confirmedUserTextRef.current + sentence;
-    confirmedUserTextRef.current = newConfirmedText;
-    
     setMessages(prev => {
       const last = prev[prev.length - 1];
+      
+      // 마지막 메시지가 완료된 user 메시지인 경우 (텍스트 메시지) 무시
+      if (last?.type === 'user' && last?.status === 'complete') {
+        return prev;
+      }
+      
+      // 서버가 전체 누적 문장을 보내므로, sentence를 그대로 사용
+      confirmedUserTextRef.current = sentence;
       
       if (last?.id === STREAMING_USER_ID) {
         return [
           ...prev.slice(0, -1),
-          createStreamingMessage(STREAMING_USER_ID, 'user', newConfirmedText)
+          createStreamingMessage(STREAMING_USER_ID, 'user', sentence)
         ];
       }
       
-      return [...prev, createStreamingMessage(STREAMING_USER_ID, 'user', newConfirmedText)];
-    });
-  }, []);
-
-  /**
-   * BOT_SUBTITLE: 봇 응답 시작
-   * - 사용자 스트리밍 있으면 → 완료 처리 + 봇 스트리밍 시작
-   * - 봇 스트리밍 있으면 → 이어붙이기
-   */
-  const handleBotSubtitle = useCallback((chunk: string) => {
-    setMessages(prev => {
-      const last = prev[prev.length - 1];
-
-      if (last?.id === STREAMING_USER_ID) {
-        setIsBotResponding(true);
-        confirmedUserTextRef.current = '';  // 사용자 발화 끝났으니 초기화
-        return [
-          ...prev.slice(0, -1),
-          createCompleteMessage('user', last.text),
-          createStreamingMessage(STREAMING_BOT_ID, 'ai', chunk)
-        ];
-      }
-
-      if (last?.id === STREAMING_BOT_ID) {
-        return [
-          ...prev.slice(0, -1),
-          createStreamingMessage(STREAMING_BOT_ID, 'ai', last.text + chunk)
-        ];
-      }
-
-      setIsBotResponding(true);
-      return [...prev, createStreamingMessage(STREAMING_BOT_ID, 'ai', chunk)];
+      return [...prev, createStreamingMessage(STREAMING_USER_ID, 'user', sentence)];
     });
   }, []);
 
@@ -142,11 +118,13 @@ export const useChatMessages = () => {
    * TURN_COMPLETE: 대화 턴 완료
    * 봇 스트리밍 → 완료 메시지로 교체
    */
-  const handleTurnComplete = useCallback((_user: string, bot: string) => {
+  const handleTurnComplete = useCallback((user: string, bot: string) => {
     setMessages(prev => [
       ...prev.slice(0, -1),
-      createCompleteMessage('ai', bot)
+      createCompleteMessage('user', user),
+      createCompleteMessage('ai', bot),
     ]);
+    clearStreamingMessages();
     setIsBotResponding(false);
   }, []);
 
@@ -179,7 +157,6 @@ export const useChatMessages = () => {
       onServerReady: handleServerReady,
       onUserSubtitleChunk: handleUserSubtitleChunk,
       onUserSentence: handleUserSentence,
-      onBotSubtitle: handleBotSubtitle,
       onTurnComplete: handleTurnComplete,
       onEmotion: handleEmotion,
       onInterrupted: handleInterrupted,
