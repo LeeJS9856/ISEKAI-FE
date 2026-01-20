@@ -16,8 +16,7 @@ export interface ChatMessage {
 export type WebSocketMessageType =
   | 'SERVER_READY'
   | 'USER_SUBTITLE_CHUNK'
-  | 'USER_ONE_SENTENCE_SUBTITLE'
-  | 'BOT_SUBTITLE'
+  | 'USER_SUBTITLE_COMPLETE'
   | 'TURN_COMPLETE'
   | 'EMOTION'
   | 'INTERRUPTED'
@@ -76,8 +75,7 @@ export interface ErrorContent {
 export type WebSocketMessage =
   | { messageType: 'SERVER_READY'; content: ServerReadyContent }
   | { messageType: 'USER_SUBTITLE_CHUNK'; content: SubtitleContent }
-  | { messageType: 'USER_ONE_SENTENCE_SUBTITLE'; content: SubtitleContent }
-  | { messageType: 'BOT_SUBTITLE'; content: SubtitleContent }
+  | { messageType: 'USER_SUBTITLE_COMPLETE'; content: SubtitleContent }
   | { messageType: 'TURN_COMPLETE'; content: TurnCompleteContent }
   | { messageType: 'EMOTION'; content: EmotionContent }
   | { messageType: 'INTERRUPTED'; content: InterruptedContent }
@@ -90,7 +88,6 @@ export interface WebSocketEventHandlers {
   onServerReady?: () => void;
   onUserSubtitleChunk?: (text: string) => void;
   onUserSentence?: (text: string) => void;
-  onBotSubtitle?: (text: string) => void;
   onTurnComplete?: (user: string, bot: string) => void;
   onEmotion?: (emotion: EmotionType) => void;
   onInterrupted?: () => void;

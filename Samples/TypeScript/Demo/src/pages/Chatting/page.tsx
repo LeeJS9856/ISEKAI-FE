@@ -73,7 +73,6 @@ const ChattingPage = () => {
     isServerReady, 
     isConnected,
     isMicActive,
-    isVoiceDetected,
     sendTextMessage,
     toggleMic
   } = useWebSocket({
@@ -216,7 +215,6 @@ const ChattingPage = () => {
             disabled={!isServerReady}
           >
             {isMicActive ? <BsFillMicFill size={22} /> : <BsMicMuteFill size={22} />}
-            {isVoiceDetected && <VoiceIndicator />}
           </MicButton>
         </ChatInputWrapper>
       </ChatUIWrapper>
