@@ -30,7 +30,6 @@ export const useWebSocket = ({
   onServerReady,
   onUserSubtitleChunk,
   onUserSentence,
-  onBotSubtitle,
   onTurnComplete,
   onEmotion,
   onInterrupted,
@@ -49,7 +48,6 @@ export const useWebSocket = ({
     onServerReady,
     onUserSubtitleChunk,
     onUserSentence,
-    onBotSubtitle,
     onTurnComplete,
     onEmotion,
     onInterrupted,
@@ -60,13 +58,12 @@ export const useWebSocket = ({
       onServerReady,
       onUserSubtitleChunk,
       onUserSentence,
-      onBotSubtitle,
       onTurnComplete,
       onEmotion,
       onInterrupted,
       onError
     };
-  }, [onServerReady, onUserSubtitleChunk, onUserSentence, onBotSubtitle, onTurnComplete, onEmotion, onInterrupted, onError]);
+  }, [onServerReady, onUserSubtitleChunk, onUserSentence, onTurnComplete, onEmotion, onInterrupted, onError]);
 
   // 오디오 재생 훅
   const { playAudio , getCurrentRms } = useAudioPlayback();
@@ -145,12 +142,8 @@ export const useWebSocket = ({
               handlersRef.current.onUserSubtitleChunk?.(message.content.text);
               break;
 
-            case 'USER_ONE_SENTENCE_SUBTITLE':
+            case 'USER_SUBTITLE_COMPLETE':
               handlersRef.current.onUserSentence?.(message.content.text);
-              break;
-
-            case 'BOT_SUBTITLE':
-              handlersRef.current.onBotSubtitle?.(message.content.text);
               break;
 
             case 'TURN_COMPLETE':
